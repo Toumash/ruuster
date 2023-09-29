@@ -8,6 +8,8 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v2 # for grpc
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
