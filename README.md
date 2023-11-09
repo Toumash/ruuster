@@ -11,7 +11,7 @@
 
 ```rs
 # to run the server
-cargo watch -x 'run --bin server'
+cargo watch --poll -x 'run --bin server'
 
 # to run the client
 cargo run --bin client
