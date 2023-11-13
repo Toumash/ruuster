@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package mq;
+
+service MQ {
+    rpc Produce(ProduceRequest) returns (google.protobuf.Empty) {}
+    rpc Consume (google.protobuf.Empty) returns (ConsumeResponse) {}
+}
+
+
+message ProduceRequest {
+    string message = 1;
+}
+
+message ConsumeResponse {
+    string message = 1;
+}

@@ -1,21 +1,25 @@
 [package]
-name = "rust-grpc"
+name = "ruuster"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "ruuster-server"
+path = "src/server.rs"
 
 [[bin]]
-name = "client"
+name = "ruuster-client"
 path = "src/client.rs"
-[[bin]]
-name = "server"
-path = "src/server.rs"
+
 
 [dependencies]
 prost = "0.12.1"
-tokio = { version = "1.32.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
+serde = "1.0.192"
+tokio = { version = "1.34.0",  features = ["macros", "rt-multi-thread"] }
 tonic = "0.10.2"
+
+
 
 [build-dependencies]
 tonic-build = "0.10.2"
