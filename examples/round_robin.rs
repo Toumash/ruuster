@@ -1,3 +1,9 @@
+// Here we have another example which is extention of first one
+// Now program spawns WORKERS_COUNT amount of consumers and they "eat" messages one by one
+// in cyclic fashion, so now we have an ability to determine 
+// which thread will consume next message
+// Additionally I reduced busy-waits and sleeps on threads using conditional variables
+
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
@@ -76,7 +82,6 @@ impl Channel {
         if let Some(queue) = queues_read.get(&queue_name) {
             let mut queue_write = queue.lock().unwrap();
             queue_write.push_back(body.clone());
-            // println!("Message published to queue '{}', body: '{}'.", queue_name, body);
             drop(queue_write);
         } else {
             println!("Error: Queue '{}' not found.", queue_name);

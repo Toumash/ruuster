@@ -1,6 +1,6 @@
 use hello_world::greeter_client::GreeterClient;
 use hello_world::HelloRequest;
-use std::io::{self, stdout};
+use std::io::{self};
 
 pub mod hello_world {
     tonic::include_proto!("helloworld");
@@ -23,5 +23,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let response = client.say_hello(request).await?;
         println!("RESPONSE={:?}", response);
     }
-    Ok(())
 }

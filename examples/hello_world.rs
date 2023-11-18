@@ -1,15 +1,22 @@
+// In this example program spawns two threads
+// * first - consumer that will infinitely wait for messages incoming into queue
+// * second - producer that will publish 100 messages into queue
+// note that we can add another consumer thread on the same queue but
+// we dont have any meaningful way to predict which consumer will "eat" message
+// we can also add another queue to hashmap in runtime (thanks Rust Gods for RwLock)
+
 use std::collections::{VecDeque, HashMap};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 
-type MessageType = String;
-type CallbackType = fn(MessageType) -> ();
-type QueueNameType = String;
-type QueueType = VecDeque<MessageType>;
-type QueueContainerType = HashMap<QueueNameType, Mutex<QueueType>>;
+type Message = String;
+type Callback = fn(Message) -> ();
+type QueueName = String;
+type Queue = VecDeque<Message>;
+type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
 struct Channel {
-    queues : Arc<RwLock<QueueContainerType>>,
+    queues : Arc<RwLock<QueueContainer>>,
 }
 
 impl Channel {
@@ -17,13 +24,13 @@ impl Channel {
         Channel { queues: Arc::new(RwLock::new(HashMap::new())), }
     }
 
-    fn queue_declare(&mut self, name: QueueNameType) {
+    fn queue_declare(&mut self, name: QueueName) {
         let mut queues_lck = self.queues.write().unwrap();
         queues_lck.insert(name.clone(), Mutex::new(VecDeque::new()));
         println!("Queue '{}' declared!", name);
     }
 
-    fn basic_consume(&self, queue_name: QueueNameType, on_message_callback: CallbackType) {
+    fn basic_consume(&self, queue_name: QueueName, on_message_callback: Callback) {
         let queues = self.queues.clone();
         thread::spawn(move || {
             loop {
@@ -43,7 +50,7 @@ impl Channel {
         });
     }
 
-    fn basic_publish(&mut self, queue_name: QueueNameType, body: MessageType) {
+    fn basic_publish(&mut self, queue_name: QueueName, body: Message) {
         let queues_read = self.queues.read().unwrap();
         if let Some(queue) = queues_read.get(&queue_name) {
             let mut queue_write = queue.lock().unwrap();
