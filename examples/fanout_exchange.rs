@@ -46,7 +46,7 @@ impl Channel {
 
     fn basic_consume(&self, queue_name: QueueName, on_message_callback: Callback) -> JoinHandle<()> {
         let queues = self.queues.clone();
-        let handle =thread::spawn(move || {
+        let handle = thread::spawn(move || {
             loop {
                 let queues_read = queues.read().unwrap();
                 if let Some(queue) = queues_read.get(&queue_name){

@@ -8,6 +8,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use rand::Rng;
 
 type Message = String;
 type WorkerId = usize;
@@ -94,7 +95,8 @@ fn process_message(message: Message, worker_id: &usize) {
         "Start of processing: '{}' by worker with id {}",
         message, worker_id
     );
-    thread::sleep(Duration::from_secs(1));
+    let milis = rand::thread_rng().gen_range(500..1000);
+    thread::sleep(Duration::from_millis(milis));
     println!("End of processing: '{}'", message);
 }
 
