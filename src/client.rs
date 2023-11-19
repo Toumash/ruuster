@@ -1,28 +1,26 @@
 use std::io;
 
-use ruuster::{ruuster_client::RuusterClient, QueueDeclareRequest, Empty};
+use ruuster::{ruuster_client::RuusterClient, Empty, QueueDeclareRequest};
 use tonic::transport::Channel;
 
-use crate::ruuster::{ExchangeDeclareRequest, ExchangeDefinition};
+use crate::ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
 
 pub mod ruuster {
     tonic::include_proto!("ruuster");
 }
 
-fn handle_menu() -> i32
-{
-    println!("-----------------------------");
+fn handle_menu() -> i32 {
     println!("Ruuster gRPC queues demo");
     println!("Choose option: [0-3]");
     println!("[1] add queue");
     println!("[2] list queues");
     println!("[3] add exchange");
     println!("[4] list exchanges");
-    // println!("[4] bind queue to exchange");
-    // println!("[5] list binds");
+    println!("[5] bind queue to exchange");
+    println!("[5] list binds");
     // println!("[6] publish");
     // println!("[7] start listening");
-    // println!("[0] quit");
+    println!("[0] quit");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
 
@@ -36,18 +34,22 @@ fn handle_menu() -> i32
     }
 }
 
-async fn add_queue(client: &mut RuusterClient<Channel>) ->  Result<(), Box<dyn std::error::Error>>
-{
+async fn add_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
     println!("Enter queue name: ");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
-    let _response = 
-        client.queue_declare(QueueDeclareRequest { queue_name: buffer.trim().into() }).await?;
-    
+    let _response = client
+        .queue_declare(QueueDeclareRequest {
+            queue_name: buffer.trim().into(),
+        })
+        .await?;
+
     Ok(())
 }
 
-async fn list_queues(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+async fn list_queues(
+    client: &mut RuusterClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("List of queues:");
     let response = client.list_queues(Empty {}).await?;
     for entry in response.get_ref().queue_names.iter() {
@@ -56,23 +58,58 @@ async fn list_queues(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn 
     Ok(())
 }
 
-async fn add_exchange(client: &mut RuusterClient<Channel>) ->  Result<(), Box<dyn std::error::Error>>
-{
-    println!("Enter queue name: ");
+async fn add_exchange(
+    client: &mut RuusterClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Enter exchange name: ");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
-    let response = 
-        client.exchange_declare(ExchangeDeclareRequest{
-            exchange: Some(
-                ExchangeDefinition{
-                    exchange_name: buffer.trim().into(),
-                    kind: 0
-                }
-            )
-        }
-    ).await?;
+    let response = client
+        .exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                exchange_name: buffer.trim().into(),
+                kind: 0,
+            }),
+        })
+        .await?;
 
+    match response.get_ref().status_code {
+        0 => Ok(()),
+        other => Err(format!("Server return error code: {}", other).into()),
+    }
+}
+
+async fn list_exchanges(
+    client: &mut RuusterClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    println!("List of exchanges:");
+    let response = client.list_exchanges(Empty {}).await?;
+    for entry in response.get_ref().exchange_names.iter() {
+        println!("{}", entry);
+    }
     Ok(())
+}
+
+async fn bind_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("Type existring queue name: ");
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer)?;
+    let queue_name = buffer.trim();
+
+    println!("Type existing exchange name: ");
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer)?;
+    let exchange_name = buffer.trim();
+
+    let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+        queue_name: queue_name.into(),
+        exchange_name: exchange_name.into(),
+    }).await?;
+
+    match response.get_ref().status_code {
+        0 => Ok(()),
+        other => Err(format!("Server return error code: {}", other).into()),
+    }
 }
 
 #[tokio::main]
@@ -85,8 +122,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             1 => add_queue(&mut client).await?,
             2 => list_queues(&mut client).await?,
             3 => add_exchange(&mut client).await?,
+            4 => list_exchanges(&mut client).await?,
+            5 => bind_queue(&mut client).await?,
             0 => return Ok(()),
-            _ => return Err("Runtime error".into())
+            _ => return Err("Runtime error".into()),
         }
         println!("-----------------------------");
     }
