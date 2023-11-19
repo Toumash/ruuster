@@ -1,26 +1,93 @@
-use hello_world::greeter_client::GreeterClient;
-use hello_world::HelloRequest;
-use std::io::{self};
+use std::io;
 
-pub mod hello_world {
-    tonic::include_proto!("helloworld");
+use ruuster::{ruuster_client::RuusterClient, QueueDeclareRequest, Empty};
+use tonic::transport::Channel;
+
+use crate::ruuster::{ExchangeDeclareRequest, ExchangeDefinition};
+
+pub mod ruuster {
+    tonic::include_proto!("ruuster");
+}
+
+fn handle_menu() -> i32
+{
+    println!("-----------------------------");
+    println!("Ruuster gRPC queues demo");
+    println!("Choose option: [0-3]");
+    println!("[1] add queue");
+    println!("[2] list queues");
+    println!("[3] add exchange");
+    println!("[4] list exchanges");
+    // println!("[4] bind queue to exchange");
+    // println!("[5] list binds");
+    // println!("[6] publish");
+    // println!("[7] start listening");
+    // println!("[0] quit");
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer).unwrap();
+
+    let number = buffer.trim().parse();
+    match number {
+        Ok(n @ 0..=7) => return n,
+        _ => {
+            println!("Wrong option - exiting program");
+            return 0;
+        }
+    }
+}
+
+async fn add_queue(client: &mut RuusterClient<Channel>) ->  Result<(), Box<dyn std::error::Error>>
+{
+    println!("Enter queue name: ");
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer)?;
+    let _response = 
+        client.queue_declare(QueueDeclareRequest { queue_name: buffer.trim().into() }).await?;
+    
+    Ok(())
+}
+
+async fn list_queues(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    println!("List of queues:");
+    let response = client.list_queues(Empty {}).await?;
+    for entry in response.get_ref().queue_names.iter() {
+        println!("{}", entry);
+    }
+    Ok(())
+}
+
+async fn add_exchange(client: &mut RuusterClient<Channel>) ->  Result<(), Box<dyn std::error::Error>>
+{
+    println!("Enter queue name: ");
+    let mut buffer = String::new();
+    io::stdin().read_line(&mut buffer)?;
+    let response = 
+        client.exchange_declare(ExchangeDeclareRequest{
+            exchange: Some(
+                ExchangeDefinition{
+                    exchange_name: buffer.trim().into(),
+                    kind: 0
+                }
+            )
+        }
+    ).await?;
+
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut client = GreeterClient::connect("http://0.0.0.0:50051").await?;
-
-    println!("Yo, press enter to send a message");
+    let mut client = RuusterClient::connect("http://127.0.0.1:50051").await?;
 
     loop {
-        // std::thread::sleep(std::time::Duration::from_secs(1));
-        let mut buffer = String::new();
-        io::stdin().read_line(&mut buffer)?;
-
-        let request = tonic::Request::new(HelloRequest {
-            name: "Tonic".into(),
-        });
-        let response = client.say_hello(request).await?;
-        println!("RESPONSE={:?}", response);
+        let menu_opt = handle_menu();
+        match menu_opt {
+            1 => add_queue(&mut client).await?,
+            2 => list_queues(&mut client).await?,
+            3 => add_exchange(&mut client).await?,
+            0 => return Ok(()),
+            _ => return Err("Runtime error".into())
+        }
+        println!("-----------------------------");
     }
 }

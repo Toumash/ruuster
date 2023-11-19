@@ -17,6 +17,7 @@ prost = "0.12.1"
 tokio = { version = "1.32.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tonic = "0.10.2"
 rand = "0.8"
+exchanges = {path = "exchanges"}
 
 [build-dependencies]
 tonic-build = "0.10.2"

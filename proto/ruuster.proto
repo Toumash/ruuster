@@ -1,0 +1,77 @@
+syntax = "proto3";
+package ruuster;
+
+enum ExchangeKind {
+    FANOUT = 0;
+}
+
+message MessageBody {
+    string payload = 1;
+}
+
+message ExchangeDefinition {
+    ExchangeKind kind = 1;
+    string exchange_name = 2;
+}
+
+message Empty {}
+
+service Ruuster {
+    rpc QueueDeclare(QueueDeclareRequest) returns (QueueDeclareResponse);
+    rpc ExchangeDeclare(ExchangeDeclareRequest) returns (ExchangeDeclareResponse);
+    rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (BindQueueToExchangeResponse);
+    rpc PublishToExchange(PublishToExchangeRequest) returns (PublishToExchangeResponse);
+    rpc ListQueues(Empty) returns (ListQueuesResponse);
+    rpc ListExchanges(Empty) returns (ListExchangesResponse);
+}
+
+message QueueDeclareRequest {
+    string queue_name = 1;
+}
+
+message QueueDeclareResponse {
+    uint32 status_code = 1;
+}
+
+message ExchangeDeclareRequest {
+    ExchangeDefinition exchange = 1;
+}
+
+message ExchangeDeclareResponse {
+    uint32 status_code = 1;
+}
+
+message BindQueueToExchangeRequest {
+    string exchange_name = 1;
+    string queue_name = 2;
+}
+
+message BindQueueToExchangeResponse {
+    uint32 status_code = 1;
+}
+
+message PublishToExchangeRequest
+{
+    string exchange = 1;
+    MessageBody body = 2;
+}
+
+message PublishToExchangeResponse
+{
+    uint32 status_code = 1;
+}
+
+message ListQueuesResponse
+{
+    repeated string queue_names = 1;
+}
+
+message ListExchangesResponse
+{
+    repeated string exchange_names = 1;
+}
+
+message ListBindingsResponse
+{
+    map<string, ExchangeDefinition> bind = 1;
+}
