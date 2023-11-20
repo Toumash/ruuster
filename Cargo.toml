@@ -13,8 +13,10 @@ name = "server"
 path = "src/server.rs"
 
 [dependencies]
+log = "0.4.20"
 prost = "0.12.1"
 tokio = { version = "1.32.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
+tokio-stream = "0.1.14"
 tonic = "0.10.2"
 rand = "0.8"
 exchanges = {path = "exchanges"}

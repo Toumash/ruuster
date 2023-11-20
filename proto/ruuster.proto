@@ -5,8 +5,17 @@ enum ExchangeKind {
     FANOUT = 0;
 }
 
+message MessageHeader {
+    string exchange_name = 1;
+}
+
 message MessageBody {
     string payload = 1;
+}
+
+message Message {
+    MessageHeader header = 1;
+    MessageBody body = 2;
 }
 
 message ExchangeDefinition {
@@ -17,28 +26,21 @@ message ExchangeDefinition {
 message Empty {}
 
 service Ruuster {
-    rpc QueueDeclare(QueueDeclareRequest) returns (QueueDeclareResponse);
-    rpc ExchangeDeclare(ExchangeDeclareRequest) returns (ExchangeDeclareResponse);
-    rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (BindQueueToExchangeResponse);
-    rpc PublishToExchange(PublishToExchangeRequest) returns (PublishToExchangeResponse);
+    rpc QueueDeclare(QueueDeclareRequest) returns (Empty);
+    rpc ExchangeDeclare(ExchangeDeclareRequest) returns (Empty);
+    rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (Empty);
     rpc ListQueues(Empty) returns (ListQueuesResponse);
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
+    rpc Produce(stream Message) returns (Empty);
+    rpc Consume(ListenRequest) returns (stream Message);
 }
 
 message QueueDeclareRequest {
     string queue_name = 1;
 }
 
-message QueueDeclareResponse {
-    uint32 status_code = 1;
-}
-
 message ExchangeDeclareRequest {
     ExchangeDefinition exchange = 1;
-}
-
-message ExchangeDeclareResponse {
-    uint32 status_code = 1;
 }
 
 message BindQueueToExchangeRequest {
@@ -46,19 +48,10 @@ message BindQueueToExchangeRequest {
     string queue_name = 2;
 }
 
-message BindQueueToExchangeResponse {
-    uint32 status_code = 1;
-}
-
 message PublishToExchangeRequest
 {
     string exchange = 1;
     MessageBody body = 2;
-}
-
-message PublishToExchangeResponse
-{
-    uint32 status_code = 1;
 }
 
 message ListQueuesResponse
@@ -71,7 +64,7 @@ message ListExchangesResponse
     repeated string exchange_names = 1;
 }
 
-message ListBindingsResponse
+message ListenRequest
 {
-    map<string, ExchangeDefinition> bind = 1;
+    string queue_name = 1;
 }

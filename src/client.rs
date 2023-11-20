@@ -17,7 +17,6 @@ fn handle_menu() -> i32 {
     println!("[3] add exchange");
     println!("[4] list exchanges");
     println!("[5] bind queue to exchange");
-    println!("[5] list binds");
     // println!("[6] publish");
     // println!("[7] start listening");
     println!("[0] quit");
@@ -38,7 +37,7 @@ async fn add_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn st
     println!("Enter queue name: ");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
-    let _response = client
+    client
         .queue_declare(QueueDeclareRequest {
             queue_name: buffer.trim().into(),
         })
@@ -64,7 +63,7 @@ async fn add_exchange(
     println!("Enter exchange name: ");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer)?;
-    let response = client
+    client
         .exchange_declare(ExchangeDeclareRequest {
             exchange: Some(ExchangeDefinition {
                 exchange_name: buffer.trim().into(),
@@ -73,10 +72,7 @@ async fn add_exchange(
         })
         .await?;
 
-    match response.get_ref().status_code {
-        0 => Ok(()),
-        other => Err(format!("Server return error code: {}", other).into()),
-    }
+    Ok(())
 }
 
 async fn list_exchanges(
@@ -101,15 +97,12 @@ async fn bind_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn s
     io::stdin().read_line(&mut buffer)?;
     let exchange_name = buffer.trim();
 
-    let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+    client.bind_queue_to_exchange(BindQueueToExchangeRequest {
         queue_name: queue_name.into(),
         exchange_name: exchange_name.into(),
     }).await?;
 
-    match response.get_ref().status_code {
-        0 => Ok(()),
-        other => Err(format!("Server return error code: {}", other).into()),
-    }
+    Ok(())
 }
 
 #[tokio::main]
