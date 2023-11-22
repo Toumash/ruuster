@@ -3,8 +3,8 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::Status;
 use tonic::{transport::Server, Response};
-use tonic::{Request, Status};
 
 use ruuster::ruuster_server::*;
 use ruuster::*;
@@ -19,7 +19,7 @@ pub mod ruuster {
 type Message = ruuster::Message;
 type QueueName = String;
 type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
@@ -45,7 +45,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let mut queues_lock = self.queues.write().unwrap();
         queues_lock.insert(
             request.get_ref().queue_name.clone(),
-            Mutex::new(VecDeque::new()),
+            Arc::new(Mutex::new(VecDeque::new())),
         );
         log::trace!("queue declare finished successfully");
         Ok(Response::new(Empty {}))
@@ -141,30 +141,85 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
     type ConsumeStream = ReceiverStream<Result<Message, Status>>;
 
     /**
-     * this request will receive messages from specific queue in form of asynchronous stream
+     * this request will receive messages from specific queue and return it in form of asynchronous stream
      */
     async fn consume(
         &self,
-        _request: tonic::Request<ListenRequest>,
+        request: tonic::Request<ListenRequest>,
     ) -> Result<Response<Self::ConsumeStream>, Status> {
-        let (_tx, rx) = mpsc::channel(4);
+        
+        let queue_name = request.into_inner().queue_name;
+        let (tx, rx) = mpsc::channel(4);
+        let queues = self.queues.clone();
+
+        tokio::spawn(async move {
+            loop {
+                let message = {
+                    let queues_read = queues.read().unwrap();
+    
+                    let queue_arc = match queues_read.get(&queue_name) {
+                        Some(queue) => queue.clone(),
+                        None => {
+                            eprintln!("queue not found");
+                            return;
+                        }
+                    };
+    
+                    let mut queue = queue_arc.lock().unwrap();
+                    queue.pop_front()
+                };
+
+                if let Some(message) = message {
+                    if tx.send(Ok(message)).await.is_err() {
+                        break;
+                    }
+                } else {
+                    tokio::task::yield_now().await;
+                }
+            }
+        });
+
         Ok(Response::new(ReceiverStream::new(rx)))
     }
 
     /**
-     * this request will take messages in form of asynchronous stream and push them into proper exchange
-     * exchange will decide what to do with each one of them
+     * for now let's have a simple producer that will push message into exchange requested in message header
      */
-    async fn produce(
-        &self,
-        _request: Request<tonic::Streaming<Message>>,
-    ) -> Result<Response<Empty>, Status> {
+    async fn produce(&self, request: tonic::Request<Message>) -> Result<Response<Empty>, Status> {
+        log::trace!("start produce");
+
+        let msg = request.into_inner();
+
+        let exchange_name = match &msg.header {
+            Some(h) => h.exchange_name.clone(),
+            None => return Err(Status::invalid_argument("message header is missing")),
+        };
+
+        let exchanges_read = self.exchanges.read().unwrap();
+
+        let requested_exchange = match exchanges_read.get(&exchange_name) {
+            Some(exchange) => exchange,
+            None => return Err(Status::not_found("requested exchange doesn't exist")),
+        };
+
+        let requested_exchange_read = requested_exchange.read().unwrap();
+        let queues_names = requested_exchange_read.get_bound_queue_names();
+        let queues_read = self.queues.read().unwrap();
+
+        for name in queues_names {
+            if let Some(queue) = queues_read.get(name) {
+                queue.lock().unwrap().push_back(msg.clone());
+            }
+        }
+
         Ok(Response::new(Empty {}))
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+    log::info!("Welcome!");
     let addr = "127.0.0.1:50051".parse().unwrap();
     let ruuster_queue_service = RuusterQueues::new();
 

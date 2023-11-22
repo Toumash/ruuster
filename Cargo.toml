@@ -14,6 +14,7 @@ path = "src/server.rs"
 
 [dependencies]
 log = "0.4.20"
+env_logger = "0.10.1"
 prost = "0.12.1"
 tokio = { version = "1.32.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1.14"

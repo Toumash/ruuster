@@ -31,7 +31,7 @@ service Ruuster {
     rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (Empty);
     rpc ListQueues(Empty) returns (ListQueuesResponse);
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
-    rpc Produce(stream Message) returns (Empty);
+    rpc Produce(Message) returns (Empty);
     rpc Consume(ListenRequest) returns (stream Message);
 }
 
@@ -46,12 +46,6 @@ message ExchangeDeclareRequest {
 message BindQueueToExchangeRequest {
     string exchange_name = 1;
     string queue_name = 2;
-}
-
-message PublishToExchangeRequest
-{
-    string exchange = 1;
-    MessageBody body = 2;
 }
 
 message ListQueuesResponse
