@@ -19,7 +19,7 @@ pub mod ruuster {
 type Message = ruuster::Message;
 type QueueName = String;
 type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
+type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
@@ -45,7 +45,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let mut queues_lock = self.queues.write().unwrap();
         queues_lock.insert(
             request.get_ref().queue_name.clone(),
-            Arc::new(Mutex::new(VecDeque::new())),
+            Mutex::new(VecDeque::new()),
         );
         log::trace!("queue declare finished successfully");
         Ok(Response::new(Empty {}))
@@ -68,7 +68,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             other => {
                 let msg = format!("exchange({}) not supported yet", other);
                 log::error!("{}", msg);
-                return Err(Status::new(tonic::Code::Unimplemented, msg));
+                return Err(Status::unimplemented(msg));
             }
         };
 
@@ -128,7 +128,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             (_, _) => {
                 let msg = "binding failed - parsing was unsucessfull";
                 log::error!("{}", msg);
-                return Err(Status::new(tonic::Code::NotFound, msg));
+                return Err(Status::not_found(msg));
             }
         };
 
@@ -158,9 +158,9 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
                     let queues_read = queues.read().unwrap();
     
                     let queue_arc = match queues_read.get(&queue_name) {
-                        Some(queue) => queue.clone(),
+                        Some(queue) => queue,
                         None => {
-                            eprintln!("queue not found");
+                            eprintln!("requested queue doesn't exist");
                             return;
                         }
                     };
@@ -209,6 +209,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         for name in queues_names {
             if let Some(queue) = queues_read.get(name) {
                 queue.lock().unwrap().push_back(msg.clone());
+                log::trace!("message sent");
             }
         }
 

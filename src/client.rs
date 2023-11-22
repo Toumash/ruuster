@@ -1,6 +1,6 @@
 use std::io;
 
-use ruuster::{ruuster_client::RuusterClient, Empty, QueueDeclareRequest, ListenRequest};
+use ruuster::{ruuster_client::RuusterClient, Empty, ListenRequest, QueueDeclareRequest};
 use tonic::transport::Channel;
 
 use crate::ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
@@ -18,7 +18,7 @@ fn console_input(msg: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn handle_menu() -> i32 {
     println!("Ruuster gRPC queues demo");
-    println!("Choose option: [0-3]");
+    println!("Choose option: [0-7]");
     println!("[1] add queue");
     println!("[2] list queues");
     println!("[3] add exchange");
@@ -41,12 +41,10 @@ fn handle_menu() -> i32 {
 }
 
 async fn add_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Enter queue name: ");
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer)?;
+    let queue_name = console_input("Type queue name")?;
     client
         .queue_declare(QueueDeclareRequest {
-            queue_name: buffer.trim().into(),
+            queue_name: queue_name.into(),
         })
         .await?;
 
@@ -67,13 +65,11 @@ async fn list_queues(
 async fn add_exchange(
     client: &mut RuusterClient<Channel>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Enter exchange name: ");
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer)?;
+    let exchange_name = console_input("Type exchange name: ")?;
     client
         .exchange_declare(ExchangeDeclareRequest {
             exchange: Some(ExchangeDefinition {
-                exchange_name: buffer.trim().into(),
+                exchange_name: exchange_name.into(),
                 kind: 0,
             }),
         })
@@ -94,15 +90,8 @@ async fn list_exchanges(
 }
 
 async fn bind_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
-    println!("Type existring queue name: ");
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer)?;
-    let queue_name = buffer.trim();
-
-    println!("Type existing exchange name: ");
-    let mut buffer = String::new();
-    io::stdin().read_line(&mut buffer)?;
-    let exchange_name = buffer.trim();
+    let queue_name = console_input("Type queue name: ")?;
+    let exchange_name = console_input("Type exchange name: ")?;
 
     client
         .bind_queue_to_exchange(BindQueueToExchangeRequest {
@@ -118,22 +107,31 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
     let exchange_name = console_input("Type exisintg exchange name: ")?;
     let payload = console_input("Type message to the other side: ")?;
 
-    let message = ruuster::Message {
-        header: Some(ruuster::MessageHeader {
-            exchange_name: exchange_name,
-        }),
-        body: Some(ruuster::MessageBody {
-            payload: payload,
-        }),
+    let amount_str = console_input("Type number of repeats")?;
+    let amount = match amount_str.parse::<u32>() {
+        Ok(n) => n,
+        Err(e) => {
+            return Err(format!("Failed to parse: {}", e).into());
+        }
     };
 
-    client.produce(message).await?;
+    for idx in 0..amount {
+        let message = ruuster::Message {
+            header: Some(ruuster::MessageHeader {
+                exchange_name: exchange_name.clone(),
+            }),
+            body: Some(ruuster::MessageBody {
+                payload: format!("Index: {}| Payload: {}", idx, payload.clone()),
+            }),
+        };
+        client.produce(message).await?;
+    }
 
     Ok(())
 }
 
 async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
-    let queue_name = console_input("Type existing query name: ")?;
+    let queue_name = console_input("Type existing queue name: ")?;
     let request = ListenRequest { queue_name };
     let mut response_stream = client.consume(request).await?.into_inner();
     while let Some(message) = response_stream.message().await? {
@@ -149,16 +147,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let menu_opt = handle_menu();
-        match menu_opt {
-            1 => add_queue(&mut client).await?,
-            2 => list_queues(&mut client).await?,
-            3 => add_exchange(&mut client).await?,
-            4 => list_exchanges(&mut client).await?,
-            5 => bind_queue(&mut client).await?,
-            6 => produce(&mut client).await?,
-            7 => listen(&mut client).await?,
+        let error = match menu_opt {
+            1 => add_queue(&mut client).await,
+            2 => list_queues(&mut client).await,
+            3 => add_exchange(&mut client).await,
+            4 => list_exchanges(&mut client).await,
+            5 => bind_queue(&mut client).await,
+            6 => produce(&mut client).await,
+            7 => listen(&mut client).await,
             0 => return Ok(()),
             _ => return Err("Runtime error".into()),
+        };
+        if let Err(e) = error {
+            println!("Non critical error occured: {:?}", e);
         }
         println!("-----------------------------");
     }
