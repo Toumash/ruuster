@@ -21,3 +21,4 @@ tokio-stream = "0.1.14"
 ruuster-grpc = { path = "../ruuster_grpc" }
 env_logger = "0.10.1"
 protos = { path = "../protos" }
+utils = { path = "../utils" }
