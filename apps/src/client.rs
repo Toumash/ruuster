@@ -3,11 +3,9 @@ use std::io;
 use ruuster::{ruuster_client::RuusterClient, Empty, ListenRequest, QueueDeclareRequest};
 use tonic::transport::Channel;
 
-use crate::ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
+use ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
 
-pub mod ruuster {
-    tonic::include_proto!("ruuster");
-}
+use protos::ruuster;
 
 fn console_input(msg: &str) -> Result<String, Box<dyn std::error::Error>> {
     println!("{}", msg);

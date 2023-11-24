@@ -1,4 +1,4 @@
-# ruuster
+# Ruuster
 > rabbitmq & kafka killer 🐰💥🔫 
 
 
@@ -16,4 +16,15 @@ cargo watch -x 'run --bin server'
 # to run the client
 cargo run --bin client
 ```
+---
+# Ruuster workspace
+
+
+| Crate        | Description                                                     | 
+|--------------|:----------------------------------------------------------------|
+| exchanges    | library definig exchangers behavior / logic of message trasport | 
+| ruuster-qrpc | library that will contain implementation of gRPC server         |
+| utils        | library with common utilities                                   |
+| apps         | crate containing binaries built using our project               |
+
 
