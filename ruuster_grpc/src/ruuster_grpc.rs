@@ -115,21 +115,30 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let queues = self.queues.read().unwrap();
         let excahnges = self.exchanges.read().unwrap();
 
-        match (queues.get(queue_name), excahnges.get(exchange_name)) {
+        let mut exchange_write = match (queues.get(queue_name), excahnges.get(exchange_name)) {
             (Some(_), Some(e)) => {
-                let mut e_lock = e.write().unwrap();
-                e_lock.bind(queue_name);
+                e.write().unwrap()
             }
             (_, _) => {
-                let msg = "binding failed - parsing was unsucessfull";
+                let msg = "binding failed: requested queue or exchange doesn't exists";
                 log::error!("{}", msg);
                 return Err(Status::not_found(msg));
             }
         };
 
-        log::trace!("bind_queue_to_exchange finished sucessfully");
+        match exchange_write.bind(queue_name)
+        {
+            Ok(()) => {
+                log::trace!("bind_queue_to_exchange finished sucessfully");
+                return Ok(Response::new(Empty {}));
+            },
+            Err(e) => {
+                let msg = format!("binding failed: {}", e);
+                log::error!("{}", msg);
+                return Err(Status::internal(msg));
+            }
+        }
 
-        Ok(Response::new(Empty {}))
     }
 
     //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... lov-level ;)
@@ -199,8 +208,11 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 
         let requested_exchange_read = requested_exchange.read().unwrap();
         
-        requested_exchange_read.handle_message(&msg, self.queues.clone());
-        log::trace!("message sent");
+        match requested_exchange_read.handle_message(&msg, self.queues.clone()) {
+            Ok(()) => log::trace!("message sent"),
+            Err(e) => log::error!("error occured while handling message: {}", e)
+        };
+        
 
         Ok(Response::new(Empty {}))
     }
