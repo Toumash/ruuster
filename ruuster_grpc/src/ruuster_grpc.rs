@@ -3,14 +3,14 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::Status;
 use tonic::Response;
+use tonic::Status;
 
 use exchanges::types::*;
 use exchanges::*;
 
-use protos::*;
 use protos::ruuster;
+use protos::*;
 
 type QueueName = String;
 type Queue = VecDeque<Message>;
@@ -116,9 +116,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let excahnges = self.exchanges.read().unwrap();
 
         let mut exchange_write = match (queues.get(queue_name), excahnges.get(exchange_name)) {
-            (Some(_), Some(e)) => {
-                e.write().unwrap()
-            }
+            (Some(_), Some(e)) => e.write().unwrap(),
             (_, _) => {
                 let msg = "binding failed: requested queue or exchange doesn't exists";
                 log::error!("{}", msg);
@@ -126,19 +124,17 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             }
         };
 
-        match exchange_write.bind(queue_name)
-        {
+        match exchange_write.bind(queue_name) {
             Ok(()) => {
                 log::trace!("bind_queue_to_exchange finished sucessfully");
                 return Ok(Response::new(Empty {}));
-            },
+            }
             Err(e) => {
                 let msg = format!("binding failed: {}", e);
                 log::error!("{}", msg);
                 return Err(Status::internal(msg));
             }
         }
-
     }
 
     //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... lov-level ;)
@@ -151,7 +147,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ListenRequest>,
     ) -> Result<Response<Self::ConsumeStream>, Status> {
-        
         let queue_name = request.into_inner().queue_name;
         let (tx, rx) = mpsc::channel(4);
         let queues = self.queues.clone();
@@ -160,7 +155,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             loop {
                 let message = {
                     let queues_read = queues.read().unwrap();
-    
+
                     let queue_arc = match queues_read.get(&queue_name) {
                         Some(queue) => queue,
                         None => {
@@ -168,7 +163,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
                             return;
                         }
                     };
-    
+
                     let mut queue = queue_arc.lock().unwrap();
                     queue.pop_front()
                 };
@@ -207,13 +202,136 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         };
 
         let requested_exchange_read = requested_exchange.read().unwrap();
-        
+
         match requested_exchange_read.handle_message(&msg, self.queues.clone()) {
             Ok(()) => log::trace!("message sent"),
-            Err(e) => log::error!("error occured while handling message: {}", e)
+            Err(e) => log::error!("error occured while handling message: {}", e),
         };
-        
 
         Ok(Response::new(Empty {}))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::net::SocketAddr;
+    use std::sync::Once;
+    use std::time::Duration;
+
+    use tokio::net::TcpListener;
+    use tokio_stream::wrappers::TcpListenerStream;
+    use tonic::transport::Server;
+
+    use protos::ruuster::Empty;
+    use protos::ruuster_client::RuusterClient;
+    use protos::ruuster_server::RuusterServer;
+
+    use super::*;
+
+    const TEST_SERVER_ADDR: &str = "127.0.0.1:0";
+    const TEST_SERVER_DELAY: u64 = 100;
+
+    static ONCE: Once = Once::new();
+
+    async fn setup_server() -> SocketAddr {
+        ONCE.call_once(|| {
+            env_logger::init();
+        });
+
+        println!("seting up a server");
+        let listener = TcpListener::bind(TEST_SERVER_ADDR).await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let ruuster_queue_service = RuusterQueues::new();
+
+        tokio::spawn(async move {
+            Server::builder()
+                .add_service(RuusterServer::new(ruuster_queue_service))
+                .serve_with_incoming(TcpListenerStream::new(listener))
+                .await
+                .unwrap();
+        });
+
+        tokio::time::sleep(Duration::from_millis(TEST_SERVER_DELAY)).await;
+        addr
+    }
+
+    async fn setup_client(
+        addr: SocketAddr,
+    ) -> Result<RuusterClient<tonic::transport::Channel>, tonic::transport::Error> {
+        RuusterClient::connect(format!("http://{}", addr)).await
+    }
+
+    #[tokio::test]
+    async fn test_declare_and_list_queues() {
+        let addr = setup_server().await;
+
+        let mut client = setup_client(addr).await.expect("failed to create client");
+
+        assert!(client
+            .queue_declare(QueueDeclareRequest {
+                queue_name: "q1".to_string()
+            })
+            .await
+            .is_ok());
+        assert!(client
+            .queue_declare(QueueDeclareRequest {
+                queue_name: "q2".to_string()
+            })
+            .await
+            .is_ok());
+        assert!(client
+            .queue_declare(QueueDeclareRequest {
+                queue_name: "q3".to_string()
+            })
+            .await
+            .is_ok());
+
+        let list_result = client.list_queues(Empty {}).await;
+        assert!(list_result.is_ok(), "failed to call list_queues");
+        let list = list_result.unwrap();
+
+        assert_eq!(list.get_ref().queue_names.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_declare_and_list_exchanges() {
+        let addr = setup_server().await;
+
+        let mut client = setup_client(addr).await.expect("failed to create client");
+
+        assert!(client
+            .exchange_declare(ExchangeDeclareRequest {
+                exchange: Some(ExchangeDefinition {
+                    kind: 0,
+                    exchange_name: "e1".to_string()
+                })
+            })
+            .await
+            .is_ok());
+        assert!(client
+            .exchange_declare(ExchangeDeclareRequest {
+                exchange: Some(ExchangeDefinition {
+                    kind: 0,
+                    exchange_name: "e2".to_string()
+                })
+            })
+            .await
+            .is_ok());
+        assert!(client
+            .exchange_declare(ExchangeDeclareRequest {
+                exchange: Some(ExchangeDefinition {
+                    kind: 0,
+                    exchange_name: "e3".to_string()
+                })
+            })
+            .await
+            .is_ok());
+
+        let list_result = client.list_exchanges(Empty {}).await;
+        assert!(list_result.is_ok(), "failed to call list_exchanges");
+        let list = list_result.unwrap();
+
+        assert_eq!(list.get_ref().exchange_names.len(), 3);
     }
 }
