@@ -24,8 +24,8 @@ pub struct RuusterQueues {
 impl RuusterQueues {
     pub fn new() -> Self {
         RuusterQueues {
-            queues: Arc::new(RwLock::new(HashMap::new())),
-            exchanges: Arc::new(RwLock::new(HashMap::new())),
+            queues: Arc::new(RwLock::new(QueueContainer::new())),
+            exchanges: Arc::new(RwLock::new(ExchangeContainer::new())),
         }
     }
 }
@@ -37,9 +37,15 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         request: tonic::Request<QueueDeclareRequest>,
     ) -> Result<tonic::Response<Empty>, Status> {
         log::trace!("started queue_declare");
+        let queue_name = request.get_ref().queue_name.clone();
         let mut queues_lock = self.queues.write().unwrap();
+        if let Some(_) = queues_lock.get(&queue_name) {
+            let msg = format!("queue({}) already exists", queue_name.clone());
+            log::error!("{}", msg);
+            return Err(Status::already_exists(msg));
+        }
         queues_lock.insert(
-            request.get_ref().queue_name.clone(),
+            queue_name,
             Mutex::new(VecDeque::new()),
         );
         log::trace!("queue declare finished successfully");
@@ -55,6 +61,11 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let exchange_def = request.get_ref().exchange.clone().unwrap();
         match exchange_def.kind {
             0 => {
+                if let Some(_) = exchanges_lock.get(&exchange_def.exchange_name) {
+                    let msg = format!("exchange({}) already exists", exchange_def.exchange_name.clone());
+                    log::error!("{}", msg);
+                    return Err(Status::already_exists(msg));
+                }
                 exchanges_lock.insert(
                     exchange_def.exchange_name,
                     Arc::new(RwLock::new(FanoutExchange::default())),
@@ -265,73 +276,123 @@ mod tests {
     #[tokio::test]
     async fn test_declare_and_list_queues() {
         let addr = setup_server().await;
-
         let mut client = setup_client(addr).await.expect("failed to create client");
 
-        assert!(client
-            .queue_declare(QueueDeclareRequest {
-                queue_name: "q1".to_string()
-            })
-            .await
-            .is_ok());
-        assert!(client
-            .queue_declare(QueueDeclareRequest {
-                queue_name: "q2".to_string()
-            })
-            .await
-            .is_ok());
-        assert!(client
-            .queue_declare(QueueDeclareRequest {
-                queue_name: "q3".to_string()
-            })
-            .await
-            .is_ok());
+        let response = client.queue_declare(QueueDeclareRequest {
+            queue_name: "q1".to_string(),
+        });
+        assert!(response.await.is_ok(), "creating queue: q1 failed");
 
-        let list_result = client.list_queues(Empty {}).await;
-        assert!(list_result.is_ok(), "failed to call list_queues");
-        let list = list_result.unwrap();
+        let response = client.queue_declare(QueueDeclareRequest {
+            queue_name: "q2".to_string(),
+        });
+        assert!(response.await.is_ok(), "creating queue: q2 failed");
 
+        let response = client.queue_declare(QueueDeclareRequest {
+            queue_name: "q3".to_string(),
+        });
+        assert!(response.await.is_ok(), "creating queue: q3 failed");
+
+        // adding queue with duplicate name should fail
+        let response = client.queue_declare(QueueDeclareRequest {
+            queue_name: "q3".to_string(),
+        });
+        assert!(response.await.is_err(), "duplicate queue should fail");
+
+        let list_response = client.list_queues(Empty {}).await;
+        assert!(list_response.is_ok(), "listing queues failed");
+
+        let list = list_response.unwrap();
         assert_eq!(list.get_ref().queue_names.len(), 3);
     }
 
     #[tokio::test]
     async fn test_declare_and_list_exchanges() {
         let addr = setup_server().await;
-
         let mut client = setup_client(addr).await.expect("failed to create client");
 
-        assert!(client
-            .exchange_declare(ExchangeDeclareRequest {
-                exchange: Some(ExchangeDefinition {
-                    kind: 0,
-                    exchange_name: "e1".to_string()
-                })
-            })
-            .await
-            .is_ok());
-        assert!(client
-            .exchange_declare(ExchangeDeclareRequest {
-                exchange: Some(ExchangeDefinition {
-                    kind: 0,
-                    exchange_name: "e2".to_string()
-                })
-            })
-            .await
-            .is_ok());
-        assert!(client
-            .exchange_declare(ExchangeDeclareRequest {
-                exchange: Some(ExchangeDefinition {
-                    kind: 0,
-                    exchange_name: "e3".to_string()
-                })
-            })
-            .await
-            .is_ok());
+        let response = client.exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                kind: ExchangeKind::Fanout as i32,
+                exchange_name: "e1".to_string(),
+            }),
+        });
+        assert!(response.await.is_ok(), "creating exchange: e1 failed");
 
-        let list_result = client.list_exchanges(Empty {}).await;
-        assert!(list_result.is_ok(), "failed to call list_exchanges");
-        let list = list_result.unwrap();
+        let response = client.exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                kind: ExchangeKind::Fanout as i32,
+                exchange_name: "e2".to_string(),
+            }),
+        });
+        assert!(response.await.is_ok(), "creating exchange: e2 failed");
+
+        let response = client.exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                kind: ExchangeKind::Fanout as i32,
+                exchange_name: "e3".to_string(),
+            }),
+        });
+        assert!(response.await.is_ok(), "creating exchange: e3 failed");
+
+        // adding exchange with duplicate name should fail
+        let response = client.exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                kind: ExchangeKind::Fanout as i32,
+                exchange_name: "e3".to_string(),
+            }),
+        });
+        assert!(response.await.is_err(), "duplicate exchange should fail");
+
+        let list_response = client.list_exchanges(Empty {}).await;
+        assert!(list_response.is_ok(), "failed to call list_exchanges");
+        let list = list_response.unwrap();
 
         assert_eq!(list.get_ref().exchange_names.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_bind_queue() {
+        let addr = setup_server().await;
+        let mut client = setup_client(addr).await.expect("failed to create client");
+
+        // add exchange
+        let response = client.exchange_declare(ExchangeDeclareRequest {
+            exchange: Some(ExchangeDefinition {
+                kind: ExchangeKind::Fanout as i32,
+                exchange_name: "e1".to_string(),
+            }),
+        });
+        assert!(response.await.is_ok(), "creating exchange failed");
+
+        // add queue
+        let response = client.queue_declare(QueueDeclareRequest {
+            queue_name: "q1".to_string(),
+        });
+        assert!(response.await.is_ok(), "creating queue failed");
+
+        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+            exchange_name: "e1".to_string(),
+            queue_name: "q1".to_string(),
+        });
+        assert!(response.await.is_ok(), "binding failed");
+
+        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+            exchange_name: "e1".to_string(),
+            queue_name: "q1".to_string(),
+        });
+        assert!(response.await.is_err(), "creating binding failed");
+
+        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+            exchange_name: "e2".to_string(),
+            queue_name: "q1".to_string(),
+        });
+        assert!(response.await.is_err(), "binding to non-existing exchange should fail");
+
+        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
+            exchange_name: "e1".to_string(),
+            queue_name: "q2".to_string(),
+        });
+        assert!(response.await.is_err(), "binding non-existing queue should fail");
     }
 }

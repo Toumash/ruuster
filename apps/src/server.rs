@@ -3,11 +3,14 @@ use protos::ruuster_server::RuusterServer;
 
 use tonic::transport::Server;
 
+const SERVER_IP: &str = "127.0.0.1";
+const SERVER_PORT: &str = "50051";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     log::info!("Welcome!");
-    let addr = "127.0.0.1:50051".parse().unwrap();
+    let addr = format!("{}:{}", SERVER_IP, SERVER_PORT).parse().unwrap();
     let ruuster_queue_service = RuusterQueues::new();
 
     Server::builder()
