@@ -1,0 +1,14 @@
+[package]
+name = "exchanges"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/exchanges.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+prost = "0.12.3"
+tonic = "0.10.2"
+protos = { path = "../protos" }
