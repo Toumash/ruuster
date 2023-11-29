@@ -24,10 +24,10 @@ fn handle_menu() -> i32 {
 
     let number = buffer.trim().parse();
     match number {
-        Ok(n @ 0..=7) => return n,
+        Ok(n @ 0..=7) => n,
         _ => {
             println!("Wrong option - exiting program");
-            return 0;
+            0
         }
     }
 }
@@ -36,7 +36,7 @@ async fn add_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn st
     let queue_name = console_input("Type queue name")?;
     client
         .queue_declare(QueueDeclareRequest {
-            queue_name: queue_name.into(),
+            queue_name,
         })
         .await?;
 
@@ -61,7 +61,7 @@ async fn add_exchange(
     client
         .exchange_declare(ExchangeDeclareRequest {
             exchange: Some(ExchangeDefinition {
-                exchange_name: exchange_name.into(),
+                exchange_name,
                 kind: 0,
             }),
         })
@@ -87,8 +87,8 @@ async fn bind_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn s
 
     client
         .bind_queue_to_exchange(BindQueueToExchangeRequest {
-            queue_name: queue_name.into(),
-            exchange_name: exchange_name.into(),
+            queue_name,
+            exchange_name,
         })
         .await?;
 

@@ -30,6 +30,13 @@ impl RuusterQueues {
     }
 }
 
+impl Default for RuusterQueues
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[tonic::async_trait]
 impl ruuster::ruuster_server::Ruuster for RuusterQueues {
     async fn queue_declare(
@@ -39,7 +46,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         log::trace!("started queue_declare");
         let queue_name = request.get_ref().queue_name.clone();
         let mut queues_lock = self.queues.write().unwrap();
-        if let Some(_) = queues_lock.get(&queue_name) {
+        if queues_lock.get(&queue_name).is_some() {
             let msg = format!("queue({}) already exists", queue_name.clone());
             log::error!("{}", msg);
             return Err(Status::already_exists(msg));
@@ -61,7 +68,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let exchange_def = request.get_ref().exchange.clone().unwrap();
         match exchange_def.kind {
             0 => {
-                if let Some(_) = exchanges_lock.get(&exchange_def.exchange_name) {
+                if exchanges_lock.get(&exchange_def.exchange_name).is_some() {
                     let msg = format!("exchange({}) already exists", exchange_def.exchange_name.clone());
                     log::error!("{}", msg);
                     return Err(Status::already_exists(msg));
@@ -90,7 +97,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let queues_lock = self.queues.read().unwrap();
         let response = ListQueuesResponse {
             queue_names: queues_lock.iter().map(|queue| queue.0.clone()).collect(),
-            ..ListQueuesResponse::default()
         };
         log::trace!("list_queues finished sucessfully");
         Ok(Response::new(response))
@@ -108,7 +114,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
                 .iter()
                 .map(|exchange| exchange.0.clone())
                 .collect(),
-            ..ListExchangesResponse::default()
         };
         log::trace!("list_exchanges finished sucessfully");
         Ok(Response::new(response))
