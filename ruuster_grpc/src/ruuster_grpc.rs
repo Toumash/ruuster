@@ -30,8 +30,7 @@ impl RuusterQueues {
     }
 }
 
-impl Default for RuusterQueues
-{
+impl Default for RuusterQueues {
     fn default() -> Self {
         Self::new()
     }
@@ -51,10 +50,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             log::error!("{}", msg);
             return Err(Status::already_exists(msg));
         }
-        queues_lock.insert(
-            queue_name,
-            Mutex::new(VecDeque::new()),
-        );
+        queues_lock.insert(queue_name, Mutex::new(VecDeque::new()));
         log::trace!("queue declare finished successfully");
         Ok(Response::new(Empty {}))
     }
@@ -66,13 +62,16 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         log::trace!("started queue_declare");
         let mut exchanges_lock = self.exchanges.write().unwrap();
         let exchange_def = request.get_ref().exchange.clone().unwrap();
+        if exchanges_lock.get(&exchange_def.exchange_name).is_some() {
+            let msg = format!(
+                "exchange({}) already exists",
+                exchange_def.exchange_name.clone()
+            );
+            log::error!("{}", msg);
+            return Err(Status::already_exists(msg));
+        }
         match exchange_def.kind {
             0 => {
-                if exchanges_lock.get(&exchange_def.exchange_name).is_some() {
-                    let msg = format!("exchange({}) already exists", exchange_def.exchange_name.clone());
-                    log::error!("{}", msg);
-                    return Err(Status::already_exists(msg));
-                }
                 exchanges_lock.insert(
                     exchange_def.exchange_name,
                     Arc::new(RwLock::new(FanoutExchange::default())),
@@ -161,7 +160,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
      */
     async fn consume(
         &self,
-        request: tonic::Request<ListenRequest>,
+        request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Self::ConsumeStream>, Status> {
         let queue_name = request.into_inner().queue_name;
         let (tx, rx) = mpsc::channel(4);
@@ -169,25 +168,30 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 
         tokio::spawn(async move {
             loop {
-                let message = {
+                let message: Option<Message> = {
                     let queues_read = queues.read().unwrap();
 
-                    let queue_arc = match queues_read.get(&queue_name) {
+                    let requested_queue = match queues_read.get(&queue_name) {
                         Some(queue) => queue,
                         None => {
-                            eprintln!("requested queue doesn't exist");
-                            return;
+                            let msg = "requested queue doesn't exist";
+                            log::error!("{}", msg);
+                            return Status::not_found(msg);
                         }
                     };
 
-                    let mut queue = queue_arc.lock().unwrap();
+                    let mut queue = requested_queue.lock().unwrap();
                     queue.pop_front()
                 };
 
                 if let Some(message) = message {
                     if tx.send(Ok(message)).await.is_err() {
-                        break;
+                        let msg = "error while sending message to channel";
+                        log::error!("{}", msg.to_string());
+                        return Status::internal(msg);
                     }
+
+                    // TODO: here add auto ack request and await it
                 } else {
                     tokio::task::yield_now().await;
                 }
@@ -197,18 +201,49 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         Ok(Response::new(ReceiverStream::new(rx)))
     }
 
+    async fn consume_one(
+        &self,
+        request: tonic::Request<ConsumeRequest>,
+    ) -> Result<Response<Message>, Status> {
+        log::trace!("start consume_one");
+
+        let queue_name = &request.into_inner().queue_name;
+        let queues_read = self.queues.read().unwrap();
+
+        let requested_queue = match queues_read.get(queue_name) {
+            Some(queue) => queue,
+            None => {
+                let msg = "requested queue doesn't exist";
+                log::error!("{}", msg.to_string());
+                return Err(Status::not_found(msg));
+            }
+        };
+
+        let mut queue = requested_queue.lock().unwrap();
+
+        let message = queue.pop_front();
+
+        if message.is_none() {
+            let msg = format!("queue {} is empty", queue_name);
+            log::warn!("{}", msg);
+            return Err(Status::not_found(msg));
+        }
+
+        Ok(Response::new(Message::default()))
+    }
+
     /**
      * for now let's have a simple producer that will push message into exchange requested in message header
      */
-    async fn produce(&self, request: tonic::Request<Message>) -> Result<Response<Empty>, Status> {
+    async fn produce(
+        &self,
+        request: tonic::Request<ProduceRequest>,
+    ) -> Result<Response<Empty>, Status> {
         log::trace!("start produce");
 
-        let msg = request.into_inner();
+        let req = request.into_inner();
 
-        let exchange_name = match &msg.header {
-            Some(h) => h.exchange_name.clone(),
-            None => return Err(Status::invalid_argument("message header is missing")),
-        };
+        let exchange_name = req.exchange_name;
 
         let exchanges_read = self.exchanges.read().unwrap();
 
@@ -219,7 +254,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 
         let requested_exchange_read = requested_exchange.read().unwrap();
 
-        match requested_exchange_read.handle_message(&msg, self.queues.clone()) {
+        match requested_exchange_read.handle_message(&req.payload, self.queues.clone()) {
             Ok(()) => log::trace!("message sent"),
             Err(e) => log::error!("error occured while handling message: {}", e),
         };
@@ -229,175 +264,4 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 }
 
 #[cfg(test)]
-mod tests {
-
-    use std::net::SocketAddr;
-    use std::sync::Once;
-    use std::time::Duration;
-
-    use tokio::net::TcpListener;
-    use tokio_stream::wrappers::TcpListenerStream;
-    use tonic::transport::Server;
-
-    use protos::ruuster::Empty;
-    use protos::ruuster_client::RuusterClient;
-    use protos::ruuster_server::RuusterServer;
-
-    use super::*;
-
-    const TEST_SERVER_ADDR: &str = "127.0.0.1:0";
-    const TEST_SERVER_DELAY: u64 = 100;
-
-    static ONCE: Once = Once::new();
-
-    async fn setup_server() -> SocketAddr {
-        ONCE.call_once(|| {
-            env_logger::init();
-        });
-
-        println!("seting up a server");
-        let listener = TcpListener::bind(TEST_SERVER_ADDR).await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let ruuster_queue_service = RuusterQueues::new();
-
-        tokio::spawn(async move {
-            Server::builder()
-                .add_service(RuusterServer::new(ruuster_queue_service))
-                .serve_with_incoming(TcpListenerStream::new(listener))
-                .await
-                .unwrap();
-        });
-
-        tokio::time::sleep(Duration::from_millis(TEST_SERVER_DELAY)).await;
-        addr
-    }
-
-    async fn setup_client(
-        addr: SocketAddr,
-    ) -> Result<RuusterClient<tonic::transport::Channel>, tonic::transport::Error> {
-        RuusterClient::connect(format!("http://{}", addr)).await
-    }
-
-    #[tokio::test]
-    async fn test_declare_and_list_queues() {
-        let addr = setup_server().await;
-        let mut client = setup_client(addr).await.expect("failed to create client");
-
-        let response = client.queue_declare(QueueDeclareRequest {
-            queue_name: "q1".to_string(),
-        });
-        assert!(response.await.is_ok(), "creating queue: q1 failed");
-
-        let response = client.queue_declare(QueueDeclareRequest {
-            queue_name: "q2".to_string(),
-        });
-        assert!(response.await.is_ok(), "creating queue: q2 failed");
-
-        let response = client.queue_declare(QueueDeclareRequest {
-            queue_name: "q3".to_string(),
-        });
-        assert!(response.await.is_ok(), "creating queue: q3 failed");
-
-        // adding queue with duplicate name should fail
-        let response = client.queue_declare(QueueDeclareRequest {
-            queue_name: "q3".to_string(),
-        });
-        assert!(response.await.is_err(), "duplicate queue should fail");
-
-        let list_response = client.list_queues(Empty {}).await;
-        assert!(list_response.is_ok(), "listing queues failed");
-
-        let list = list_response.unwrap();
-        assert_eq!(list.get_ref().queue_names.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn test_declare_and_list_exchanges() {
-        let addr = setup_server().await;
-        let mut client = setup_client(addr).await.expect("failed to create client");
-
-        let response = client.exchange_declare(ExchangeDeclareRequest {
-            exchange: Some(ExchangeDefinition {
-                kind: ExchangeKind::Fanout as i32,
-                exchange_name: "e1".to_string(),
-            }),
-        });
-        assert!(response.await.is_ok(), "creating exchange: e1 failed");
-
-        let response = client.exchange_declare(ExchangeDeclareRequest {
-            exchange: Some(ExchangeDefinition {
-                kind: ExchangeKind::Fanout as i32,
-                exchange_name: "e2".to_string(),
-            }),
-        });
-        assert!(response.await.is_ok(), "creating exchange: e2 failed");
-
-        let response = client.exchange_declare(ExchangeDeclareRequest {
-            exchange: Some(ExchangeDefinition {
-                kind: ExchangeKind::Fanout as i32,
-                exchange_name: "e3".to_string(),
-            }),
-        });
-        assert!(response.await.is_ok(), "creating exchange: e3 failed");
-
-        // adding exchange with duplicate name should fail
-        let response = client.exchange_declare(ExchangeDeclareRequest {
-            exchange: Some(ExchangeDefinition {
-                kind: ExchangeKind::Fanout as i32,
-                exchange_name: "e3".to_string(),
-            }),
-        });
-        assert!(response.await.is_err(), "duplicate exchange should fail");
-
-        let list_response = client.list_exchanges(Empty {}).await;
-        assert!(list_response.is_ok(), "failed to call list_exchanges");
-        let list = list_response.unwrap();
-
-        assert_eq!(list.get_ref().exchange_names.len(), 3);
-    }
-
-    #[tokio::test]
-    async fn test_bind_queue() {
-        let addr = setup_server().await;
-        let mut client = setup_client(addr).await.expect("failed to create client");
-
-        // add exchange
-        let response = client.exchange_declare(ExchangeDeclareRequest {
-            exchange: Some(ExchangeDefinition {
-                kind: ExchangeKind::Fanout as i32,
-                exchange_name: "e1".to_string(),
-            }),
-        });
-        assert!(response.await.is_ok(), "creating exchange failed");
-
-        // add queue
-        let response = client.queue_declare(QueueDeclareRequest {
-            queue_name: "q1".to_string(),
-        });
-        assert!(response.await.is_ok(), "creating queue failed");
-
-        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
-            exchange_name: "e1".to_string(),
-            queue_name: "q1".to_string(),
-        });
-        assert!(response.await.is_ok(), "binding failed");
-
-        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
-            exchange_name: "e1".to_string(),
-            queue_name: "q1".to_string(),
-        });
-        assert!(response.await.is_err(), "creating binding failed");
-
-        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
-            exchange_name: "e2".to_string(),
-            queue_name: "q1".to_string(),
-        });
-        assert!(response.await.is_err(), "binding to non-existing exchange should fail");
-
-        let response = client.bind_queue_to_exchange(BindQueueToExchangeRequest {
-            exchange_name: "e1".to_string(),
-            queue_name: "q2".to_string(),
-        });
-        assert!(response.await.is_err(), "binding non-existing queue should fail");
-    }
-}
+mod tests;

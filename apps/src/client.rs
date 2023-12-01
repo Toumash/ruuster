@@ -1,8 +1,9 @@
 use std::io;
 
-use ruuster::{ruuster_client::RuusterClient, Empty, ListenRequest, QueueDeclareRequest};
 use tonic::transport::Channel;
+use uuid::Uuid;
 
+use ruuster::{ruuster_client::RuusterClient, Empty, ConsumeRequest, QueueDeclareRequest};
 use ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
 
 use protos::ruuster;
@@ -35,9 +36,7 @@ fn handle_menu() -> i32 {
 async fn add_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type queue name")?;
     client
-        .queue_declare(QueueDeclareRequest {
-            queue_name,
-        })
+        .queue_declare(QueueDeclareRequest { queue_name })
         .await?;
 
     Ok(())
@@ -107,16 +106,16 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
         }
     };
 
-    for idx in 0..amount {
+    for _ in 0..amount {
         let message = ruuster::Message {
-            header: Some(ruuster::MessageHeader {
-                exchange_name: exchange_name.clone(),
-            }),
-            body: Some(ruuster::MessageBody {
-                payload: format!("Index: {}| Payload: {}", idx, payload.clone()),
-            }),
+            uuid: Uuid::new_v4().to_string(),
+            payload: payload.clone(),
         };
-        client.produce(message).await?;
+        let request = ruuster::ProduceRequest {
+            payload: Some(message),
+            exchange_name: exchange_name.clone(),
+        };
+        client.produce(request).await?;
     }
 
     Ok(())
@@ -124,7 +123,7 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
 
 async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ListenRequest { queue_name };
+    let request = ConsumeRequest { queue_name, auto_ack: true };
     let mut response_stream = client.consume(request).await?.into_inner();
     while let Some(message) = response_stream.message().await? {
         println!("Received message: {:?}", message);

@@ -1,22 +1,13 @@
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MessageHeader {
-    #[prost(string, tag = "1")]
-    pub exchange_name: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MessageBody {
-    #[prost(string, tag = "1")]
-    pub payload: ::prost::alloc::string::String,
-}
+pub struct Empty {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Message {
-    #[prost(message, optional, tag = "1")]
-    pub header: ::core::option::Option<MessageHeader>,
-    #[prost(message, optional, tag = "2")]
-    pub body: ::core::option::Option<MessageBody>,
+    #[prost(string, tag = "1")]
+    pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub payload: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -26,9 +17,6 @@ pub struct ExchangeDefinition {
     #[prost(string, tag = "2")]
     pub exchange_name: ::prost::alloc::string::String,
 }
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Empty {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct QueueDeclareRequest {
@@ -63,9 +51,19 @@ pub struct ListExchangesResponse {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ListenRequest {
+pub struct ConsumeRequest {
     #[prost(string, tag = "1")]
     pub queue_name: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub auto_ack: bool,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ProduceRequest {
+    #[prost(string, tag = "1")]
+    pub exchange_name: ::prost::alloc::string::String,
+    #[prost(message, optional, tag = "2")]
+    pub payload: ::core::option::Option<Message>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -293,7 +291,7 @@ pub mod ruuster_client {
         }
         pub async fn produce(
             &mut self,
-            request: impl tonic::IntoRequest<super::Message>,
+            request: impl tonic::IntoRequest<super::ProduceRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
             self.inner
                 .ready()
@@ -312,7 +310,7 @@ pub mod ruuster_client {
         }
         pub async fn consume(
             &mut self,
-            request: impl tonic::IntoRequest<super::ListenRequest>,
+            request: impl tonic::IntoRequest<super::ConsumeRequest>,
         ) -> std::result::Result<
             tonic::Response<tonic::codec::Streaming<super::Message>>,
             tonic::Status,
@@ -331,6 +329,28 @@ pub mod ruuster_client {
             let mut req = request.into_request();
             req.extensions_mut().insert(GrpcMethod::new("ruuster.Ruuster", "Consume"));
             self.inner.server_streaming(req, path, codec).await
+        }
+        pub async fn consume_one(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ConsumeRequest>,
+        ) -> std::result::Result<tonic::Response<super::Message>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/ruuster.Ruuster/ConsumeOne",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("ruuster.Ruuster", "ConsumeOne"));
+            self.inner.unary(req, path, codec).await
         }
     }
 }
@@ -369,7 +389,7 @@ pub mod ruuster_server {
         >;
         async fn produce(
             &self,
-            request: tonic::Request<super::Message>,
+            request: tonic::Request<super::ProduceRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
         /// Server streaming response type for the Consume method.
         type ConsumeStream: tonic::codegen::tokio_stream::Stream<
@@ -379,8 +399,12 @@ pub mod ruuster_server {
             + 'static;
         async fn consume(
             &self,
-            request: tonic::Request<super::ListenRequest>,
+            request: tonic::Request<super::ConsumeRequest>,
         ) -> std::result::Result<tonic::Response<Self::ConsumeStream>, tonic::Status>;
+        async fn consume_one(
+            &self,
+            request: tonic::Request<super::ConsumeRequest>,
+        ) -> std::result::Result<tonic::Response<super::Message>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct RuusterServer<T: Ruuster> {
@@ -691,7 +715,7 @@ pub mod ruuster_server {
                 "/ruuster.Ruuster/Produce" => {
                     #[allow(non_camel_case_types)]
                     struct ProduceSvc<T: Ruuster>(pub Arc<T>);
-                    impl<T: Ruuster> tonic::server::UnaryService<super::Message>
+                    impl<T: Ruuster> tonic::server::UnaryService<super::ProduceRequest>
                     for ProduceSvc<T> {
                         type Response = super::Empty;
                         type Future = BoxFuture<
@@ -700,7 +724,7 @@ pub mod ruuster_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::Message>,
+                            request: tonic::Request<super::ProduceRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
@@ -737,7 +761,7 @@ pub mod ruuster_server {
                     struct ConsumeSvc<T: Ruuster>(pub Arc<T>);
                     impl<
                         T: Ruuster,
-                    > tonic::server::ServerStreamingService<super::ListenRequest>
+                    > tonic::server::ServerStreamingService<super::ConsumeRequest>
                     for ConsumeSvc<T> {
                         type Response = super::Message;
                         type ResponseStream = T::ConsumeStream;
@@ -747,7 +771,7 @@ pub mod ruuster_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::ListenRequest>,
+                            request: tonic::Request<super::ConsumeRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
@@ -775,6 +799,50 @@ pub mod ruuster_server {
                                 max_encoding_message_size,
                             );
                         let res = grpc.server_streaming(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/ruuster.Ruuster/ConsumeOne" => {
+                    #[allow(non_camel_case_types)]
+                    struct ConsumeOneSvc<T: Ruuster>(pub Arc<T>);
+                    impl<T: Ruuster> tonic::server::UnaryService<super::ConsumeRequest>
+                    for ConsumeOneSvc<T> {
+                        type Response = super::Message;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ConsumeRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ruuster>::consume_one(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = ConsumeOneSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
                     Box::pin(fut)
