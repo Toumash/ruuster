@@ -39,5 +39,5 @@ pub trait Exchange {
         &self,
         message: &Option<Message>,
         queues: Arc<RwLock<QueueContainer>>,
-    ) -> Result<(), ExchangeError>;
+    ) -> Result<u32, ExchangeError>;
 }

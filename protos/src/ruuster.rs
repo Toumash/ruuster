@@ -65,6 +65,12 @@ pub struct ProduceRequest {
     #[prost(message, optional, tag = "2")]
     pub payload: ::core::option::Option<Message>,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct AckRequest {
+    #[prost(string, tag = "1")]
+    pub uuid: ::prost::alloc::string::String,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum ExchangeKind {
@@ -352,6 +358,28 @@ pub mod ruuster_client {
                 .insert(GrpcMethod::new("ruuster.Ruuster", "ConsumeOne"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn ack_message(
+            &mut self,
+            request: impl tonic::IntoRequest<super::AckRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/ruuster.Ruuster/AckMessage",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("ruuster.Ruuster", "AckMessage"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -405,6 +433,10 @@ pub mod ruuster_server {
             &self,
             request: tonic::Request<super::ConsumeRequest>,
         ) -> std::result::Result<tonic::Response<super::Message>, tonic::Status>;
+        async fn ack_message(
+            &self,
+            request: tonic::Request<super::AckRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
     }
     #[derive(Debug)]
     pub struct RuusterServer<T: Ruuster> {
@@ -832,6 +864,50 @@ pub mod ruuster_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = ConsumeOneSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/ruuster.Ruuster/AckMessage" => {
+                    #[allow(non_camel_case_types)]
+                    struct AckMessageSvc<T: Ruuster>(pub Arc<T>);
+                    impl<T: Ruuster> tonic::server::UnaryService<super::AckRequest>
+                    for AckMessageSvc<T> {
+                        type Response = super::Empty;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::AckRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ruuster>::ack_message(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = AckMessageSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

@@ -19,13 +19,14 @@ fn handle_menu() -> i32 {
     println!("[5] bind queue to exchange");
     println!("[6] publish");
     println!("[7] start listening");
+    println!("[8] consume one message");
     println!("[0] quit");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
 
     let number = buffer.trim().parse();
     match number {
-        Ok(n @ 0..=7) => n,
+        Ok(n @ 0..=8) => n,
         _ => {
             println!("Wrong option - exiting program");
             0
@@ -126,9 +127,17 @@ async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::
     let request = ConsumeRequest { queue_name, auto_ack: true };
     let mut response_stream = client.consume(request).await?.into_inner();
     while let Some(message) = response_stream.message().await? {
-        println!("Received message: {:?}", message);
+        println!("Received message: {:#?}", message);
     }
 
+    Ok(())
+}
+
+async fn consume_one_message(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    let queue_name = console_input("Type existing queue name: ")?;
+    let request = ConsumeRequest{ queue_name, auto_ack: true };
+    let response = client.consume_one(request).await?;
+    println!("Received message: {:#?}", response);
     Ok(())
 }
 
@@ -146,11 +155,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             5 => bind_queue(&mut client).await,
             6 => produce(&mut client).await,
             7 => listen(&mut client).await,
+            8 => consume_one_message(&mut client).await,
             0 => return Ok(()),
             _ => return Err("Runtime error".into()),
         };
         if let Err(e) = error {
-            println!("Non critical error occured: {:?}", e);
+            println!("Non critical error occured: {:#?}", e);
         }
         println!("-----------------------------");
     }

@@ -25,7 +25,7 @@ impl Exchange for FanoutExchange {
         &self,
         message: &Option<Message>,
         queues: Arc<RwLock<QueueContainer>>,
-    ) -> Result<(), ExchangeError> {
+    ) -> Result<u32, ExchangeError> {
         if message.is_none() {
             return Err(ExchangeError::EmptyPayloadFail {
                 reason: "sent message has no content".to_string(),
@@ -34,13 +34,15 @@ impl Exchange for FanoutExchange {
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
+        let mut pushed_counter: u32 = 0;
         for name in queues_names {
             if let Some(queue) = queues_read.get(name) {
                 queue.lock().unwrap().push_back(message.clone().unwrap());
+                pushed_counter+=1;
             }
         }
 
-        Ok(())
+        Ok(pushed_counter)
     }
 }
 
@@ -92,9 +94,9 @@ mod tests {
             payload: "#abadcaffe".to_string(),
         });
 
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
 
         let queues_read = queues.read().unwrap();
         for (_, queue_mutex) in queues_read.iter() {

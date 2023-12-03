@@ -1,7 +1,8 @@
 use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
@@ -12,13 +13,16 @@ use exchanges::*;
 use protos::ruuster;
 use protos::*;
 
+type Uuid = String;
 type QueueName = String;
 type Queue = VecDeque<Message>;
 type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+type AckContainer = HashMap<Uuid, Arc<(Notify, AtomicU32)>>;
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
     exchanges: Arc<RwLock<ExchangeContainer>>,
+    acks: Arc<RwLock<AckContainer>>,
 }
 
 impl RuusterQueues {
@@ -26,6 +30,7 @@ impl RuusterQueues {
         RuusterQueues {
             queues: Arc::new(RwLock::new(QueueContainer::new())),
             exchanges: Arc::new(RwLock::new(ExchangeContainer::new())),
+            acks: Arc::new(RwLock::new(AckContainer::new())),
         }
     }
 }
@@ -42,7 +47,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<QueueDeclareRequest>,
     ) -> Result<tonic::Response<Empty>, Status> {
-        log::trace!("started queue_declare");
         let queue_name = request.get_ref().queue_name.clone();
         let mut queues_lock = self.queues.write().unwrap();
         if queues_lock.get(&queue_name).is_some() {
@@ -59,7 +63,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ExchangeDeclareRequest>,
     ) -> Result<tonic::Response<Empty>, Status> {
-        log::trace!("started queue_declare");
         let mut exchanges_lock = self.exchanges.write().unwrap();
         let exchange_def = request.get_ref().exchange.clone().unwrap();
         if exchanges_lock.get(&exchange_def.exchange_name).is_some() {
@@ -92,7 +95,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListQueuesResponse>, tonic::Status> {
-        log::trace!("started list_queues");
         let queues_lock = self.queues.read().unwrap();
         let response = ListQueuesResponse {
             queue_names: queues_lock.iter().map(|queue| queue.0.clone()).collect(),
@@ -105,8 +107,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListExchangesResponse>, tonic::Status> {
-        log::trace!("started list_exchanges");
-
         let exchanges_lock = self.exchanges.read().unwrap();
         let response = ListExchangesResponse {
             exchange_names: exchanges_lock
@@ -122,8 +122,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<BindQueueToExchangeRequest>,
     ) -> Result<tonic::Response<Empty>, tonic::Status> {
-        log::trace!("started bind_queue_to_exchange");
-
         let queue_name = &request.get_ref().queue_name;
         let exchange_name = &request.get_ref().exchange_name;
 
@@ -185,13 +183,11 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
                 };
 
                 if let Some(message) = message {
-                    if tx.send(Ok(message)).await.is_err() {
-                        let msg = "error while sending message to channel";
-                        log::error!("{}", msg.to_string());
+                    if let Err(e) = tx.send(Ok(message)).await {
+                        let msg = format!("error while sending message to channel: {}", e);
+                        log::error!("{}", msg);
                         return Status::internal(msg);
                     }
-
-                    // TODO: here add auto ack request and await it
                 } else {
                     tokio::task::yield_now().await;
                 }
@@ -205,31 +201,43 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Message>, Status> {
-        log::trace!("start consume_one");
+        let req = request.into_inner();
 
-        let queue_name = &request.into_inner().queue_name;
-        let queues_read = self.queues.read().unwrap();
+        let (queue_name, message_option) = {
+            let queue_name = &req.queue_name;
+            let queues_read = self.queues.read().unwrap();
 
-        let requested_queue = match queues_read.get(queue_name) {
-            Some(queue) => queue,
-            None => {
-                let msg = "requested queue doesn't exist";
-                log::error!("{}", msg.to_string());
-                return Err(Status::not_found(msg));
-            }
+            let requested_queue = match queues_read.get(queue_name) {
+                Some(queue) => queue,
+                None => {
+                    let msg = "requested queue doesn't exist";
+                    log::error!("{}", msg);
+                    return Err(Status::not_found(msg));
+                }
+            };
+
+            let mut queue = requested_queue.lock().unwrap();
+
+            (queue_name, queue.pop_front())
         };
 
-        let mut queue = requested_queue.lock().unwrap();
-
-        let message = queue.pop_front();
-
-        if message.is_none() {
+        if message_option.is_none() {
             let msg = format!("queue {} is empty", queue_name);
             log::warn!("{}", msg);
             return Err(Status::not_found(msg));
         }
 
-        Ok(Response::new(Message::default()))
+        let message = message_option.unwrap();
+        let uuid = &message.uuid;
+
+        if req.auto_ack {
+            self.ack_message(tonic::Request::new(AckRequest {
+                uuid: uuid.to_string(),
+            }))
+            .await?;
+        }
+
+        Ok(Response::new(message))
     }
 
     /**
@@ -239,29 +247,110 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
-        log::trace!("start produce");
-
         let req = request.into_inner();
-
         let exchange_name = req.exchange_name;
 
-        let exchanges_read = self.exchanges.read().unwrap();
+        let payload = &req.payload;
+        if payload.is_none() {
+            let msg = "payload is empty";
+            log::warn!("{}", msg);
+            return Err(Status::failed_precondition(msg));
+        }
 
-        let requested_exchange = match exchanges_read.get(&exchange_name) {
-            Some(exchange) => exchange,
-            None => return Err(Status::not_found("requested exchange doesn't exist")),
+        let uuid = &payload.as_ref().unwrap().uuid;
+
+        let requested_exchange = {
+            let exchanges_read = self.exchanges.read().unwrap();
+
+            let result = match exchanges_read.get(&exchange_name) {
+                Some(exchange) => exchange,
+                None => return Err(Status::not_found("requested exchange doesn't exist")),
+            };
+            result.clone()
         };
 
-        let requested_exchange_read = requested_exchange.read().unwrap();
-
-        match requested_exchange_read.handle_message(&req.payload, self.queues.clone()) {
-            Ok(()) => log::trace!("message sent"),
-            Err(e) => log::error!("error occured while handling message: {}", e),
+        let handling_result = {
+            let requested_exchange_read = requested_exchange.read().unwrap();
+            requested_exchange_read.handle_message(&req.payload, self.queues.clone())
         };
+
+        if let Err(e) = handling_result {
+            let msg = format!("message handling failed: {}", e);
+            log::error!("{}", msg);
+            return Err(Status::internal(msg));
+        } else {
+            log::info!(
+                "message with id: {} sent to exchange: {}",
+                &uuid,
+                &exchange_name
+            );
+        }
+
+        let uuid = req.payload.unwrap().uuid;
+        let acks_arc = self.acks.clone();
+        let ack_notification = {
+            let mut acks_write = acks_arc.write().unwrap();
+
+            acks_write
+                .entry(uuid.clone())
+                .or_insert(Arc::new((
+                    Notify::new(),
+                    AtomicU32::new(handling_result.unwrap()),
+                )))
+                .clone()
+        };
+
+        // let's wait for ack in another task
+        tokio::spawn(async move {
+            loop {
+                let flag = &ack_notification.0;
+                flag.notified().await;
+                let counter = &ack_notification.1;
+                log::info!("message {} akcnowledged", &uuid);
+                //let's check if ack_notification gathered all acknowledgment calls
+                if counter.fetch_sub(1, Ordering::SeqCst) > 1 {
+                    continue; // this message have to be acknowledged more times
+                }
+
+                // counter has value 0 so we can safely remove notification entry from container
+                let mut acks_write = acks_arc.write().unwrap();
+                match acks_write.remove(&uuid) {
+                    Some(_) => log::info!("ack notifier for {} removed", &uuid),
+                    None => log::warn!("ack notifier for {} already deleted", &uuid),
+                };
+            }
+        });
+
+        Ok(Response::new(Empty {}))
+    }
+
+    async fn ack_message(
+        &self,
+        request: tonic::Request<AckRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        log::trace!("ack_message: {:#?}", request);
+        let requested_uuid = &request.into_inner().uuid;
+        let acks_read = self.acks.read().unwrap();
+        let ack_flag_option = acks_read.get(requested_uuid);
+
+        if ack_flag_option.is_none() {
+            let msg = format!(
+                "message: {} requested for ack doesn't exist",
+                requested_uuid
+            );
+            log::error!("{}", msg);
+            return Err(Status::not_found(msg));
+        }
+
+        let ack_flag = ack_flag_option.unwrap();
+        ack_flag.0.notify_one();
 
         Ok(Response::new(Empty {}))
     }
 }
+
+#[cfg(test)]
+mod tests_utils;
 
 #[cfg(test)]
 mod tests;

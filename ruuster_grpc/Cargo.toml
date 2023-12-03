@@ -18,6 +18,7 @@ tonic = "0.10.2"
 uuid = { version = "1.6.1", features = ["v4"]}
 exchanges = { path = "../exchanges" }
 protos = { path = "../protos" }
+utils = { path = "../utils" }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
