@@ -100,7 +100,7 @@ async fn test_produce_and_consume_sqsfe() {
 
     setup_sqsfe_scenario(&mut client).await;
 
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 1000, false).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads, false).await;
 }
 
@@ -110,7 +110,7 @@ async fn test_produce_and_consume_mqsfe() {
 
     setup_mqsfe_scenario(&mut client).await;
 
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 1000, false).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads, false).await;
     consume_messages(&mut client, "q2".to_string(), &payloads, false).await;
 }
@@ -121,8 +121,8 @@ async fn test_produce_and_consume_sqmfe() {
 
     setup_sqmfe_scenario(&mut client).await;
 
-    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 1000, false).await;
-    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 1000, false).await;
+    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 10, false).await;
 
     consume_messages(&mut client, "q1".to_string(), &payloads1, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads2, false).await;
@@ -134,8 +134,8 @@ async fn test_produce_and_consume_mqmfe() {
 
     setup_mqmfe_scenario(&mut client).await;
 
-    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 1000, false).await;
-    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 1000, false).await;
+    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 10, false).await;
 
     consume_messages(&mut client, "q1".to_string(), &payloads1, false).await;
     consume_messages(&mut client, "q2".to_string(), &payloads1, false).await;

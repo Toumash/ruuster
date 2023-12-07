@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use tokio::sync::{mpsc, Notify};
+use tokio::time::timeout;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
@@ -300,26 +301,39 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
                 .clone()
         };
 
-        // let's wait for ack in another task
-        tokio::spawn(async move {
-            loop {
-                let flag = &ack_notification.0;
-                flag.notified().await;
-                let counter = &ack_notification.1;
-                log::info!("message {} akcnowledged", &uuid);
-                //let's check if ack_notification gathered all acknowledgment calls
-                if counter.fetch_sub(1, Ordering::SeqCst) > 1 {
-                    continue; // this message have to be acknowledged more times
-                }
+        let ack_future = async move {
+            let timeout_future = timeout(tokio::time::Duration::from_secs(10), async move {
+                loop {
+                    let flag = &ack_notification.0;
+                    flag.notified().await;
+                    let counter = &ack_notification.1;
+                    log::info!("message {} akcnowledged", &uuid);
+                    //let's check if ack_notification gathered all acknowledgment calls
+                    if counter.fetch_sub(1, Ordering::SeqCst) > 1 {
+                        continue; // this message have to be acknowledged more times
+                    }
 
-                // counter has value 0 so we can safely remove notification entry from container
-                let mut acks_write = acks_arc.write().unwrap();
-                match acks_write.remove(&uuid) {
-                    Some(_) => log::info!("ack notifier for {} removed", &uuid),
-                    None => log::warn!("ack notifier for {} already deleted", &uuid),
-                };
+                    // counter has value 0 so we can safely remove notification entry from container
+                    let mut acks_write = acks_arc.write().unwrap();
+                    match acks_write.remove(&uuid) {
+                        Some(_) => {
+                            log::info!("ack notifier for {} removed", &uuid);
+                            break;
+                        }
+                        None => {
+                            log::warn!("ack notifier for {} already deleted", &uuid);
+                            break;
+                        }
+                    };
+                }
+            });
+
+            match timeout_future.await {
+                Ok(_) => return,
+                Err(e) => log::error!("{}", e),
             }
-        });
+        };
+        tokio::spawn(ack_future);
 
         Ok(Response::new(Empty {}))
     }

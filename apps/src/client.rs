@@ -11,15 +11,16 @@ use utils::console_input;
 
 fn handle_menu() -> i32 {
     println!("Ruuster gRPC queues demo");
-    println!("Choose option: [0-7]");
+    println!("Choose option: [0-8]");
     println!("[1] add queue");
     println!("[2] list queues");
     println!("[3] add exchange");
     println!("[4] list exchanges");
     println!("[5] bind queue to exchange");
     println!("[6] publish");
-    println!("[7] start listening");
+    println!("[7] start consuming");
     println!("[8] consume one message");
+    println!("[9] consume one message (no ack)");
     println!("[0] quit");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
@@ -133,9 +134,9 @@ async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::
     Ok(())
 }
 
-async fn consume_one_message(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+async fn consume_one_message(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest{ queue_name, auto_ack: true };
+    let request = ConsumeRequest{ queue_name, auto_ack: auto_ack };
     let response = client.consume_one(request).await?;
     println!("Received message: {:#?}", response);
     Ok(())
@@ -155,9 +156,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             5 => bind_queue(&mut client).await,
             6 => produce(&mut client).await,
             7 => listen(&mut client).await,
-            8 => consume_one_message(&mut client).await,
+            8 => consume_one_message(&mut client, true).await,
+            9 => consume_one_message(&mut client, false).await,
             0 => return Ok(()),
-            _ => return Err("Runtime error".into()),
+            _ => return Err("wrong menu option".into()),
         };
         if let Err(e) = error {
             println!("Non critical error occured: {:#?}", e);
