@@ -11,4 +11,5 @@ path = "src/exchanges.rs"
 [dependencies]
 prost = "0.12.3"
 tonic = "0.10.2"
+uuid = { version = "1.6.1", features = ["v4"]}
 protos = { path = "../protos" }

@@ -3,15 +3,16 @@ use std::collections::HashSet;
 use crate::*;
 
 #[derive(Default)]
-pub struct FanoutExchange
-{
+pub struct FanoutExchange {
     bound_queues: HashSet<QueueName>,
 }
 
 impl Exchange for FanoutExchange {
     fn bind(&mut self, queue_name: &QueueName) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
-            return Err(ExchangeError::BindFail { reason: "name of queue must be unique".to_string() });
+            return Err(ExchangeError::BindFail {
+                reason: "name of queue must be unique".to_string(),
+            });
         }
         Ok(())
     }
@@ -20,24 +21,36 @@ impl Exchange for FanoutExchange {
         &self.bound_queues
     }
 
-    fn handle_message(&self, message: &Message, queues: Arc<RwLock<QueueContainer>>) -> Result<(), ExchangeError> {
+    fn handle_message(
+        &self,
+        message: &Option<Message>,
+        queues: Arc<RwLock<QueueContainer>>,
+    ) -> Result<u32, ExchangeError> {
+        if message.is_none() {
+            return Err(ExchangeError::EmptyPayloadFail {
+                reason: "sent message has no content".to_string(),
+            });
+        }
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
+        let mut pushed_counter: u32 = 0;
         for name in queues_names {
             if let Some(queue) = queues_read.get(name) {
-                queue.lock().unwrap().push_back(message.clone());
+                queue.lock().unwrap().push_back(message.clone().unwrap());
+                pushed_counter+=1;
             }
         }
 
-        Ok(())
+        Ok(pushed_counter)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use uuid::Uuid;
+
     use super::*;
-    use protos::ruuster::{MessageHeader, MessageBody};
 
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
@@ -50,8 +63,7 @@ mod tests {
     }
 
     #[test]
-    fn bind_test()
-    {
+    fn bind_test() {
         let mut ex = FanoutExchange::default();
         assert_eq!(ex.bind(&"q1".to_string()), Ok(()));
         assert_eq!(ex.bind(&"q2".to_string()), Ok(()));
@@ -60,8 +72,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicates_bind_test()
-    {
+    fn duplicates_bind_test() {
         let mut ex = FanoutExchange::default();
         assert_eq!(ex.bind(&"q1".to_string()), Ok(()));
         assert!(ex.bind(&"q1".to_string()).is_err());
@@ -70,8 +81,7 @@ mod tests {
     }
 
     #[test]
-    fn fanout_exchange_test()
-    {
+    fn fanout_exchange_test() {
         let queues = setup_test_queues();
         let mut ex = FanoutExchange::default();
 
@@ -79,18 +89,14 @@ mod tests {
         assert_eq!(ex.bind(&"q2".to_string()), Ok(()));
         assert_eq!(ex.bind(&"q3".to_string()), Ok(()));
 
-        let message = Message {
-            header: Some(MessageHeader {
-                exchange_name: "e1".to_string(),
-            }),
-            body: Some(MessageBody {
-                payload: format!("abadcaffe"),
-            }),
-        };
+        let message = Some(Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+        });
 
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(()));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
 
         let queues_read = queues.read().unwrap();
         for (_, queue_mutex) in queues_read.iter() {
