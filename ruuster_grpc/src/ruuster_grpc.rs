@@ -1,19 +1,16 @@
 mod acks;
 mod queues;
 
-
-use protos::{ruuster, ListBindingsRequest, ListBindingsResponse, Empty, Message, BindQueueToExchangeRequest, ListExchangesResponse, ListQueuesResponse, QueueDeclareRequest, ExchangeDeclareRequest, ConsumeRequest, ProduceRequest, AckRequest};
+use protos::{
+    ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
+    ListBindingsRequest, ListBindingsResponse, ListExchangesResponse, ListQueuesResponse, Message,
+    ProduceRequest, QueueDeclareRequest,
+};
 use queues::RuusterQueues;
 
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
-
-impl Default for RuusterQueues {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 
 #[tonic::async_trait]
 impl ruuster::ruuster_server::Ruuster for RuusterQueues {
@@ -21,7 +18,10 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<QueueDeclareRequest>,
     ) -> Result<tonic::Response<Empty>, Status> {
-        
+        let request = request.into_inner();
+        let queue_name = request.queue_name;
+
+        self.add_queue(&queue_name)?;
         Ok(Response::new(Empty {}))
     }
 
@@ -29,6 +29,13 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ExchangeDeclareRequest>,
     ) -> Result<tonic::Response<Empty>, Status> {
+        let request = request.into_inner();
+        let (exchange_name, exchange_kind) = match request.exchange {
+            Some(exchange) => (exchange.exchange_name, exchange.kind),
+            None => return Err(Status::failed_precondition("bad exchange request")),
+        };
+
+        self.add_exchange(&exchange_name, exchange_kind.into())?;
         Ok(Response::new(Empty {}))
     }
 
@@ -36,14 +43,16 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListQueuesResponse>, tonic::Status> {
-        todo!()
+        let queue_names = self.get_queues_list();
+        Ok(Response::new(ListQueuesResponse { queue_names }))
     }
 
     async fn list_exchanges(
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListExchangesResponse>, tonic::Status> {
-        todo!()
+        let exchange_names = self.get_exchanges_list();
+        Ok(Response::new(ListExchangesResponse { exchange_names }))
     }
 
     async fn bind_queue_to_exchange(

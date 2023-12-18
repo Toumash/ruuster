@@ -1,6 +1,5 @@
 use protos::Message;
 
-
 struct AckRecord {
     message: Message,
     counter: isize,
@@ -17,6 +16,9 @@ impl AckRecord {
         false
     }
 
+    /**
+     * decrease counter for message
+     */
     fn apply_ack(&self) {
 
     }
