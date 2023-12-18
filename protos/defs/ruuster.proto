@@ -8,14 +8,11 @@ service Ruuster {
     rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (Empty);
     rpc ListQueues(Empty) returns (ListQueuesResponse);
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
+    rpc ListBindings(ListBindingsRequest) returns (ListBindingsResponse);
     rpc Produce(ProduceRequest) returns (Empty);
     rpc Consume(ConsumeRequest) returns (stream Message);
     rpc ConsumeOne(ConsumeRequest) returns (Message);
     rpc AckMessage(AckRequest) returns (Empty);
-}
-
-enum ExchangeKind {
-    FANOUT = 0;
 }
 
 message Empty {}
@@ -26,7 +23,7 @@ message Message {
 }
 
 message ExchangeDefinition {
-    ExchangeKind kind = 1;
+    int32 kind = 1;
     string exchange_name = 2;
 }
 
@@ -51,6 +48,14 @@ message ListQueuesResponse
 message ListExchangesResponse
 {
     repeated string exchange_names = 1;
+}
+
+message ListBindingsRequest {
+    string exchange_name = 1;
+}
+
+message ListBindingsResponse {
+    repeated string queue_names = 1;
 }
 
 message ConsumeRequest
