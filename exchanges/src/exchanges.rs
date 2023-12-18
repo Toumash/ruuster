@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 
 use protos::ruuster::Message;
+use types::FanoutExchange;
 
 pub mod types;
 
@@ -11,7 +12,13 @@ pub type Queue = VecDeque<Message>;
 pub type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
 pub type ExchangeName = String;
-pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Send + Sync>>>;
+pub type ExchangeType = dyn Exchange + Send + Sync;
+pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
+
+#[derive(PartialEq, Debug)]
+pub enum ExchangeKind {
+    Fanout
+}
 
 #[derive(PartialEq, Debug)]
 pub enum ExchangeError {
@@ -49,4 +56,13 @@ pub trait Exchange {
         message: &Option<Message>,
         queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError>;
+}
+
+// exchanges factory
+impl ExchangeKind {
+    pub fn create(&self) -> Arc<RwLock<ExchangeType>> {
+        match self {
+            ExchangeKind::Fanout => Arc::new(RwLock::new(FanoutExchange::default())),
+        }
+    }
 }
