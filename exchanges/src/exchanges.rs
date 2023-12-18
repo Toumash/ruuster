@@ -9,7 +9,7 @@ pub mod types;
 
 type QueueName = String;
 type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
@@ -49,11 +49,28 @@ pub trait Exchange {
     ) -> Result<u32, ExchangeError>;
 }
 
-// exchanges factory
 impl ExchangeKind {
+    // exchanges factory
     pub fn create(&self) -> Arc<RwLock<ExchangeType>> {
         match self {
             ExchangeKind::Fanout => Arc::new(RwLock::new(FanoutExchange::default())),
+        }
+    }
+}
+
+impl From<i32> for ExchangeKind {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => ExchangeKind::Fanout,
+            _ => panic!("wrong value for ExchangeKind")
+        }
+    }
+}
+
+impl Into<i32> for ExchangeKind {
+    fn into(self) -> i32 {
+        match self {
+            ExchangeKind::Fanout => 0,
         }
     }
 }
