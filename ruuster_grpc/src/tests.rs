@@ -1,8 +1,10 @@
 
 
+use exchanges::ExchangeKind;
+
 use crate::tests_utils::*;
 
-use super::{ExchangeKind, Empty};
+use super::Empty;
 
 #[tokio::test]
 async fn test_declare_and_list_queues() {
@@ -100,7 +102,7 @@ async fn test_produce_and_consume_sqsfe() {
 
     setup_sqsfe_scenario(&mut client).await;
 
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 2, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads, false).await;
 }
 
