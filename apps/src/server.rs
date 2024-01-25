@@ -1,6 +1,6 @@
-use ruuster_grpc::RuusterQueues;
 use protos::ruuster_server::RuusterServer;
 
+use ruuster_grpc::queues::RuusterQueues;
 use tonic::transport::Server;
 
 const SERVER_IP: &str = "127.0.0.1";

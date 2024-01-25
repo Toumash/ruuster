@@ -17,7 +17,7 @@ impl AckRecord {
     }
 
     /**
-     * decrease counter for message
+     * decrease counter for message ack
      */
     fn apply_ack(&self) {
 

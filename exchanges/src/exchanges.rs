@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -41,7 +41,7 @@ impl fmt::Display for ExchangeError {
 
 pub trait Exchange {
     fn bind(&mut self, queue_name: &QueueName) -> Result<(), ExchangeError>;
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName>;
+    fn get_bound_queue_names(&self) -> Vec<QueueName>;
     fn handle_message(
         &self,
         message: &Option<Message>,

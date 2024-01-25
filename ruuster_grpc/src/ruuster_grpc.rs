@@ -1,5 +1,5 @@
 mod acks;
-mod queues;
+pub mod queues;
 
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
@@ -43,7 +43,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListQueuesResponse>, tonic::Status> {
-        let queue_names = self.get_queues_list();
+        let queue_names = self.get_queues_list()?;
         Ok(Response::new(ListQueuesResponse { queue_names }))
     }
 
@@ -51,7 +51,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         _request: tonic::Request<Empty>,
     ) -> Result<tonic::Response<ListExchangesResponse>, tonic::Status> {
-        let exchange_names = self.get_exchanges_list();
+        let exchange_names = self.get_exchanges_list()?;
         Ok(Response::new(ListExchangesResponse { exchange_names }))
     }
 
@@ -59,10 +59,16 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<BindQueueToExchangeRequest>,
     ) -> Result<tonic::Response<Empty>, tonic::Status> {
-        todo!()
+        let request = request.into_inner();
+
+        let _ = self.get_queue(&request.queue_name)?;
+        let _ = self.get_exchange(&request.exchange_name)?;
+
+        self.bind_queue_to_exchange(&request.queue_name, &request.exchange_name)?;
+        Ok(Response::new(Empty {}))
     }
 
-    //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... lov-level ;)
+    //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... low-level ;)
     type ConsumeStream = ReceiverStream<Result<Message, Status>>;
 
     /**
@@ -72,14 +78,18 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Self::ConsumeStream>, Status> {
-        todo!()
+        let queue_name = &request.into_inner().queue_name;
+        let async_receiver = self.start_consuming_task(queue_name).await;
+        Ok(Response::new(async_receiver))
     }
 
     async fn consume_one(
         &self,
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Message>, Status> {
-        todo!()
+        let request = request.into_inner();
+        let message = self.consume_message(&request.queue_name)?;
+        Ok(Response::new(message))
     }
 
     /**
@@ -89,36 +99,21 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         &self,
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.forward_message(&request.payload, &request.exchange_name)?;
         Ok(Response::new(Empty {}))
     }
 
     async fn ack_message(
         &self,
-        request: tonic::Request<AckRequest>,
+        _request: tonic::Request<AckRequest>,
     ) -> Result<Response<Empty>, Status> {
-        // log::trace!("ack_message: {:#?}", request);
-        // let requested_uuid = &request.into_inner().uuid;
-        // let acks_read = self.acks.read().unwrap();
-        // let ack_flag_option = acks_read.get(requested_uuid);
-
-        // if ack_flag_option.is_none() {
-        //     let msg = format!(
-        //         "message: {} requested for ack doesn't exist",
-        //         requested_uuid
-        //     );
-        //     log::error!("{}", msg);
-        //     return Err(Status::not_found(msg));
-        // }
-
-        // let ack_flag = ack_flag_option.unwrap();
-        // ack_flag.0.notify_one();
-
         Ok(Response::new(Empty {}))
     }
 
     async fn list_bindings(
         &self,
-        request: tonic::Request<ListBindingsRequest>,
+        _request: tonic::Request<ListBindingsRequest>,
     ) -> Result<Response<ListBindingsResponse>, Status> {
         todo!()
     }
