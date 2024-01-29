@@ -1,10 +1,12 @@
-use std::collections::HashSet;
+use serde_json::json;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::*;
 
 #[derive(Default)]
 pub struct FanoutExchange {
     bound_queues: HashSet<QueueName>,
+    exchange_name: String,
 }
 
 impl Exchange for FanoutExchange {
@@ -35,10 +37,46 @@ impl Exchange for FanoutExchange {
         let queues_read = queues.read().unwrap();
 
         let mut pushed_counter: u32 = 0;
+
         for name in queues_names {
+            let msg = message.clone().unwrap();
+
             if let Some(queue) = queues_read.get(name) {
-                queue.lock().unwrap().push_back(message.clone().unwrap());
-                pushed_counter+=1;
+                let queue_lock = &mut queue.lock().unwrap();
+                let queue_max_length = 1_000;
+
+                if queue_lock.len() >= queue_max_length {
+                    log::warn!("queue size reached for queue {}", name);
+
+                    if let Some(dead_letter_queue) = queues_read.get("_deadletter") {
+                        log::debug!("moving the message {} to the dead letter queue", msg.uuid);
+                        let now = SystemTime::now();
+                        let timestamp = match now.duration_since(UNIX_EPOCH) {
+                            Ok(duration) => duration.as_millis() as i64,
+                            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
+                        };
+
+                        // FIXME: convert to ruuster headers
+                        let val = json!({
+                            "count": 1,
+                            "exchange": self.exchange_name,
+                            "original_message": msg.payload,
+                            "reason": "max_len",
+                            "time": timestamp,
+                            "queue": name.to_string(),
+                        })
+                        .to_string();
+
+                        dead_letter_queue.lock().unwrap().push_back(Message {
+                            uuid: msg.uuid,
+                            payload: val,
+                        });
+                    } else {
+                        log::debug!("message {} dropped", msg.uuid);
+                    }
+                }
+                queue_lock.push_back(message.clone().unwrap());
+                pushed_counter += 1;
             }
         }
 

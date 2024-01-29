@@ -6,9 +6,9 @@ use protos::ruuster::Message;
 
 pub mod types;
 
-type QueueName = String;
-type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+pub type QueueName = String;
+pub type Queue = VecDeque<Message>;
+pub type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
 pub type ExchangeName = String;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Send + Sync>>>;

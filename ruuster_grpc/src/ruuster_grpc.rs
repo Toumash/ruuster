@@ -1,4 +1,5 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -15,9 +16,6 @@ use protos::ruuster;
 use protos::*;
 
 type Uuid = String;
-type QueueName = String;
-type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 type AckContainer = HashMap<Uuid, Arc<(Notify, AtomicU32)>>;
 
 pub struct RuusterQueues {
@@ -55,7 +53,9 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
             log::error!("{}", msg);
             return Err(Status::already_exists(msg));
         }
-        queues_lock.insert(queue_name, Mutex::new(VecDeque::new()));
+        // TODO: make the queue size configureable (rabbit - size  policy)
+        // see: https://www.rabbitmq.com/maxlength.html
+        queues_lock.insert(queue_name, Mutex::new(Queue::new()));
         log::trace!("queue declare finished successfully");
         Ok(Response::new(Empty {}))
     }
@@ -330,7 +330,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 
             match timeout_future.await {
                 Ok(_) => return,
-                Err(e) => log::error!("{}", e),
+                Err(e) => log::error!("ack error: {}", e),
             }
         };
         tokio::spawn(ack_future);
