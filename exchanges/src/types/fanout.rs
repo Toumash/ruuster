@@ -199,4 +199,43 @@ mod tests {
             one_too_many_message.uuid
         );
     }
+
+    #[test]
+    fn fanout_exchange_will_drop_message_when_deadletter_queue_does_not_exist() {
+        // arrange
+        let queues = setup_test_queues();
+        // we dont queues.insert here so theres no dead letter queue
+        let queues_read = queues.read().unwrap();
+        let dead_letter_queue = queues_read.get(DEADLETTER_QUEUE_NAME);
+        assert!(dead_letter_queue.is_none());
+
+        let mut ex = FanoutExchange::new("fanout_test".into());
+        let _ = ex.bind(&"q1".to_string());
+
+        // add the messages up to the limit
+        for _ in 1..=1000 {
+            let _ = ex
+                .handle_message(
+                    &(Some(Message {
+                        uuid: Uuid::new_v4().to_string(),
+                        payload: "#abadcaffe".to_string(),
+                    })),
+                    queues.clone(),
+                )
+                .unwrap();
+        }
+
+        let one_too_many_message = Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+        };
+
+        // act
+        let message_handled_by_queues_count = ex
+            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .unwrap();
+
+        // assert
+        assert_eq!(message_handled_by_queues_count, 0);
+    }
 }
