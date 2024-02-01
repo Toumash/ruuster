@@ -45,6 +45,11 @@ impl Exchange for FanoutExchange {
                 reason: "sent message has no content".to_string(),
             });
         }
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| ExchangeError::GetSystemTimeFail {})
+            .map(|d| d.as_millis() as i64)?;
+
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
@@ -62,11 +67,6 @@ impl Exchange for FanoutExchange {
                     if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                         // FIXME: use the deadletter queue defined per exchange
                         log::debug!("moving the message {} to the dead letter queue", msg.uuid);
-                        let now = SystemTime::now();
-                        let timestamp = match now.duration_since(UNIX_EPOCH) {
-                            Ok(duration) => duration.as_millis() as i64,
-                            Err(_) => panic!("SystemTime before UNIX EPOCH!"),
-                        };
 
                         // FIXME: convert to ruuster headers
                         let val = json!({

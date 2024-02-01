@@ -17,6 +17,7 @@ pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Sen
 pub enum ExchangeError {
     BindFail { reason: String },
     EmptyPayloadFail { reason: String },
+    GetSystemTimeFail {},
 }
 
 impl fmt::Display for ExchangeError {
@@ -27,6 +28,12 @@ impl fmt::Display for ExchangeError {
             }
             ExchangeError::EmptyPayloadFail { reason } => {
                 write!(f, "handling message failed: {}", reason)
+            }
+            ExchangeError::GetSystemTimeFail {} => {
+                write!(
+                    f,
+                    "handling message failed: SystemTime::now().duration_since"
+                )
             }
         }
     }
