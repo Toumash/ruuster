@@ -47,8 +47,8 @@ impl Exchange for FanoutExchange {
         }
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|_| ExchangeError::GetSystemTimeFail {})
-            .map(|d| d.as_millis() as i64)?;
+            .map(|d| d.as_millis() as i64)
+            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
 
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
@@ -79,10 +79,13 @@ impl Exchange for FanoutExchange {
                         })
                         .to_string();
 
-                        dead_letter_queue.lock().unwrap().push_back(Message {
-                            uuid: msg.uuid,
-                            payload: val,
-                        });
+                        dead_letter_queue
+                            .lock()
+                            .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
+                            .push_back(Message {
+                                uuid: msg.uuid,
+                                payload: val,
+                            });
                     } else {
                         log::debug!("message {} dropped", msg.uuid);
                     }

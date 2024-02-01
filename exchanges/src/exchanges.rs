@@ -18,6 +18,7 @@ pub enum ExchangeError {
     BindFail { reason: String },
     EmptyPayloadFail { reason: String },
     GetSystemTimeFail {},
+    DeadLetterQueueLockFail {},
 }
 
 impl fmt::Display for ExchangeError {
@@ -35,6 +36,7 @@ impl fmt::Display for ExchangeError {
                     "handling message failed: SystemTime::now().duration_since"
                 )
             }
+            ExchangeError::DeadLetterQueueLockFail {} => write!(f, "handling message failed: queue().lock() failed for dead letter queue"),
         }
     }
 }
