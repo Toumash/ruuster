@@ -1,10 +1,24 @@
-use std::collections::HashSet;
+use serde_json::json;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::*;
+
+pub const QUEUE_MAX_LENGTH: usize = 1_000;
+pub const DEADLETTER_QUEUE_NAME: &str = "_deadletter";
 
 #[derive(Default)]
 pub struct FanoutExchange {
     bound_queues: HashSet<QueueName>,
+    exchange_name: String,
+}
+
+impl FanoutExchange {
+    fn new(exchange_name: String) -> Self {
+        FanoutExchange {
+            bound_queues: HashSet::new(),
+            exchange_name: exchange_name,
+        }
+    }
 }
 
 impl Exchange for FanoutExchange {
@@ -31,14 +45,54 @@ impl Exchange for FanoutExchange {
                 reason: "sent message has no content".to_string(),
             });
         }
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
+
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
         let mut pushed_counter: u32 = 0;
+
         for name in queues_names {
+            let msg = message.clone().unwrap();
+
             if let Some(queue) = queues_read.get(name) {
-                queue.lock().unwrap().push_back(message.clone().unwrap());
-                pushed_counter+=1;
+                let queue_lock = &mut queue.lock().unwrap();
+
+                if queue_lock.len() >= QUEUE_MAX_LENGTH {
+                    log::warn!("queue size reached for queue {}", name);
+
+                    if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
+                        // FIXME: use the deadletter queue defined per exchange
+                        log::debug!("moving the message {} to the dead letter queue", msg.uuid);
+
+                        // FIXME: convert to ruuster headers
+                        let val = json!({
+                            "count": 1,
+                            "exchange": self.exchange_name,
+                            "original_message": msg.payload,
+                            "reason": "max_len",
+                            "time": timestamp,
+                            "queue": name.to_string(),
+                        })
+                        .to_string();
+
+                        dead_letter_queue
+                            .lock()
+                            .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
+                            .push_back(Message {
+                                uuid: msg.uuid,
+                                payload: val,
+                            });
+                    } else {
+                        log::debug!("message {} dropped", msg.uuid);
+                    }
+                } else {
+                    queue_lock.push_back(message.clone().unwrap());
+                    pushed_counter += 1;
+                }
             }
         }
 
@@ -58,6 +112,7 @@ mod tests {
         queues_write.insert("q1".to_string(), Mutex::new(Queue::new()));
         queues_write.insert("q2".to_string(), Mutex::new(Queue::new()));
         queues_write.insert("q3".to_string(), Mutex::new(Queue::new()));
+
         drop(queues_write);
         queues
     }
@@ -103,5 +158,87 @@ mod tests {
             let queue = queue_mutex.lock().unwrap();
             assert_eq!(queue.len(), 3, "Queue does not have exactly 3 messages");
         }
+    }
+
+    #[test]
+    fn fanout_exchange_will_send_message_to_dead_letter_queue_when_full() {
+        // arrange
+        let queues = setup_test_queues();
+        let mut queues_write = queues.write().unwrap();
+        queues_write.insert("_deadletter".to_string(), Mutex::new(Queue::new()));
+        drop(queues_write);
+        let mut ex = FanoutExchange::new("fanout_test".into());
+        let _ = ex.bind(&"q1".to_string());
+
+        // add the messages up to the limit
+        for _ in 1..=1000 {
+            let _ = ex
+                .handle_message(
+                    &(Some(Message {
+                        uuid: Uuid::new_v4().to_string(),
+                        payload: "#abadcaffe".to_string(),
+                    })),
+                    queues.clone(),
+                )
+                .unwrap();
+        }
+
+        let one_too_many_message = Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+        };
+
+        // act
+        let _ = ex
+            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .unwrap();
+
+        // assert
+        let queues_read = queues.read().unwrap();
+        let dead_letter_queue = &queues_read["_deadletter"];
+        assert_eq!(dead_letter_queue.lock().unwrap().len(), 1, "messages should be places into the dead letter queue after the capacity of a queue has been exhausted");
+        assert_eq!(
+            dead_letter_queue.lock().unwrap().pop_front().unwrap().uuid,
+            one_too_many_message.uuid
+        );
+    }
+
+    #[test]
+    fn fanout_exchange_will_drop_message_when_deadletter_queue_does_not_exist() {
+        // arrange
+        let queues = setup_test_queues();
+        // we dont queues.insert here so theres no dead letter queue
+        let queues_read = queues.read().unwrap();
+        let dead_letter_queue = queues_read.get(DEADLETTER_QUEUE_NAME);
+        assert!(dead_letter_queue.is_none());
+
+        let mut ex = FanoutExchange::new("fanout_test".into());
+        let _ = ex.bind(&"q1".to_string());
+
+        // add the messages up to the limit
+        for _ in 1..=1000 {
+            let _ = ex
+                .handle_message(
+                    &(Some(Message {
+                        uuid: Uuid::new_v4().to_string(),
+                        payload: "#abadcaffe".to_string(),
+                    })),
+                    queues.clone(),
+                )
+                .unwrap();
+        }
+
+        let one_too_many_message = Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+        };
+
+        // act
+        let message_handled_by_queues_count = ex
+            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .unwrap();
+
+        // assert
+        assert_eq!(message_handled_by_queues_count, 0);
     }
 }

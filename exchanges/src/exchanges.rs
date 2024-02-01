@@ -6,9 +6,9 @@ use protos::ruuster::Message;
 
 pub mod types;
 
-type QueueName = String;
-type Queue = VecDeque<Message>;
-type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+pub type QueueName = String;
+pub type Queue = VecDeque<Message>;
+pub type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
 pub type ExchangeName = String;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Send + Sync>>>;
@@ -17,6 +17,8 @@ pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Sen
 pub enum ExchangeError {
     BindFail { reason: String },
     EmptyPayloadFail { reason: String },
+    GetSystemTimeFail {},
+    DeadLetterQueueLockFail {},
 }
 
 impl fmt::Display for ExchangeError {
@@ -28,6 +30,13 @@ impl fmt::Display for ExchangeError {
             ExchangeError::EmptyPayloadFail { reason } => {
                 write!(f, "handling message failed: {}", reason)
             }
+            ExchangeError::GetSystemTimeFail {} => {
+                write!(
+                    f,
+                    "handling message failed: SystemTime::now().duration_since"
+                )
+            }
+            ExchangeError::DeadLetterQueueLockFail {} => write!(f, "handling message failed: queue().lock() failed for dead letter queue"),
         }
     }
 }
