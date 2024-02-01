@@ -110,9 +110,9 @@ mod tests {
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("q1".to_string(), Mutex::new(Queue::new()));
-        queues_write.insert("q2".to_string(), Mutex::new(Queue::new()));
-        queues_write.insert("q3".to_string(), Mutex::new(Queue::new()));
+        queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("q2".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("q3".to_string(), Arc::new(Mutex::new(Queue::new())));
         drop(queues_write);
         queues
     }
@@ -165,7 +165,7 @@ mod tests {
         // arrange
         let queues = setup_test_queues();
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("_deadletter".to_string(), Mutex::new(Queue::new()));
+        queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::new())));
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
         let _ = ex.bind(&"q1".to_string());
