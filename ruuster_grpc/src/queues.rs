@@ -7,22 +7,31 @@ use tonic::Status;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
+
+use crate::acks::AckRecord;
 
 pub type Uuid = String;
 pub type QueueName = String;
 pub type Queue = VecDeque<Message>;
 pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 
+pub type AckContainer = HashMap<Uuid, AckRecord>;
+
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
     exchanges: Arc<RwLock<ExchangeContainer>>,
+    acks: Arc<RwLock<AckContainer>>,
 }
+
+const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
 
 impl RuusterQueues {
     pub fn new() -> Self {
         RuusterQueues {
             queues: Arc::new(RwLock::new(QueueContainer::new())),
             exchanges: Arc::new(RwLock::new(ExchangeContainer::new())),
+            acks: Arc::new(RwLock::new(AckContainer::new())),
         }
     }
 
@@ -202,6 +211,54 @@ impl RuusterQueues {
         result
     }
 
+    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
+        let mut acks = self.acks.write().map_err(|e| {
+            RuusterQueues::log_status(
+                &format!("failed to acquire acks lock: {}", e),
+                tonic::Code::Unavailable,
+            )
+        })?;
+
+        match acks.get_mut(&uuid) {
+            Some(record) => {
+                record.apply_ack().map_err(|e| {
+                    RuusterQueues::log_status(
+                        &format!("appling ack for message with id: {} failed: {:?}", &uuid, e),
+                        tonic::Code::Internal,
+                    )
+                })?;
+                if record.get_counter() <= 0 {
+                    log::debug!("deleting ack record for message with uuid: {}", &uuid);
+                    acks.remove(&uuid);
+                }
+                Ok(())
+            }
+            None => Err(RuusterQueues::log_status(
+                &"could not find requested messages ack record".to_string(),
+                tonic::Code::NotFound,
+            )),
+        }
+    }
+
+    pub fn report_message(&self, message: Message, duration: Duration) -> Result<(), Status> {
+        let mut acks = self.acks.write().map_err(|e| {
+            RuusterQueues::log_status(
+                &format!("failed to acquire acks lock: {}", e),
+                tonic::Code::Unavailable,
+            )
+        })?;
+
+        let uuid = message.uuid.to_owned();
+
+        acks.entry(uuid)
+            .and_modify(|elem| {
+                elem.increment_counter();
+            })
+            .or_insert(AckRecord::new(message, Instant::now(), duration));
+
+        Ok(())
+    }
+
     pub fn consume_message(&self, queue_name: &QueueName) -> Result<Message, Status> {
         let queue = self.get_queue(queue_name)?;
 
@@ -218,7 +275,11 @@ impl RuusterQueues {
         };
 
         match message {
-            Some(msg) => Ok(msg),
+            Some(msg) => {
+                // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
+                self.report_message(msg.clone(), DEFAULT_ACK_DURATION)?;
+                return Ok(msg);
+            }
             None => Err(Status::not_found("failed to return message")),
         }
     }
@@ -231,37 +292,35 @@ impl RuusterQueues {
         let queues = self.queues.clone();
         let queue_name = queue_name.clone();
 
-        tokio::spawn(
-            async move {
-                loop {
-                    let message: Option<Message> = {
-                        let queues_read = queues.read().unwrap();
-    
-                        let requested_queue = match queues_read.get(&queue_name) {
-                            Some(queue) => queue,
-                            None => {
-                                let msg = "requested queue doesn't exist";
-                                log::error!("{}", msg);
-                                return Status::not_found(msg);
-                            }
-                        };
-    
-                        let mut queue = requested_queue.lock().unwrap();
-                        queue.pop_front()
+        tokio::spawn(async move {
+            loop {
+                let message: Option<Message> = {
+                    let queues_read = queues.read().unwrap();
+
+                    let requested_queue = match queues_read.get(&queue_name) {
+                        Some(queue) => queue,
+                        None => {
+                            let msg = "requested queue doesn't exist";
+                            log::error!("{}", msg);
+                            return Status::not_found(msg);
+                        }
                     };
 
-                    if let Some(message) = message {
-                        if let Err(e) = tx.send(Ok(message)).await {
-                            let msg = format!("error while sending message to channel: {}", e);
-                            log::error!("{}", msg);
-                            return Status::internal(msg);
-                        }
-                    } else {
-                        tokio::task::yield_now().await;
+                    let mut queue = requested_queue.lock().unwrap();
+                    queue.pop_front()
+                };
+
+                if let Some(message) = message {
+                    if let Err(e) = tx.send(Ok(message)).await {
+                        let msg = format!("error while sending message to channel: {}", e);
+                        log::error!("{}", msg);
+                        return Status::internal(msg);
                     }
+                } else {
+                    tokio::task::yield_now().await;
                 }
             }
-        );
+        });
         return ReceiverStream::new(rx);
     }
 

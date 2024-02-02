@@ -13,7 +13,7 @@ use tonic::Response;
 use tonic::Status;
 
 #[tonic::async_trait]
-impl ruuster::ruuster_server::Ruuster for RuusterQueues {
+impl ruuster::ruuster_server::Ruuster for RuusterQueues{
     async fn queue_declare(
         &self,
         request: tonic::Request<QueueDeclareRequest>,
@@ -106,8 +106,10 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
 
     async fn ack_message(
         &self,
-        _request: tonic::Request<AckRequest>,
+        request: tonic::Request<AckRequest>,
     ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.apply_message_ack(request.uuid)?;
         Ok(Response::new(Empty {}))
     }
 

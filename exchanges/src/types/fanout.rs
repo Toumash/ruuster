@@ -17,7 +17,7 @@ impl FanoutExchange {
     fn new(exchange_name: String) -> Self {
         FanoutExchange {
             bound_queues: HashSet::new(),
-            exchange_name: exchange_name,
+            exchange_name,
         }
     }
 }
