@@ -1,7 +1,4 @@
-
-
 use exchanges::ExchangeKind;
-use tonic::client;
 
 use crate::tests_utils::*;
 
@@ -152,4 +149,5 @@ async fn test_ack_ok() {
     let mut client = setup_server_and_client().await;
     setup_sqsfe_scenario(&mut client).await;
     let _ = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    consume_and_ack_messages(&mut client, "q1".to_string(), false, 10).await;
 }
