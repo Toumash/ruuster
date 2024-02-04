@@ -14,10 +14,6 @@ service Ruuster {
     rpc AckMessage(AckRequest) returns (Empty);
 }
 
-enum ExchangeKind {
-    FANOUT = 0;
-}
-
 message Empty {}
 
 message Message {
@@ -26,7 +22,7 @@ message Message {
 }
 
 message ExchangeDefinition {
-    ExchangeKind kind = 1;
+    int32 kind = 1;
     string exchange_name = 2;
 }
 

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,7 +17,7 @@ impl FanoutExchange {
     fn new(exchange_name: String) -> Self {
         FanoutExchange {
             bound_queues: HashSet::new(),
-            exchange_name: exchange_name,
+            exchange_name,
         }
     }
 }
@@ -31,8 +32,8 @@ impl Exchange for FanoutExchange {
         Ok(())
     }
 
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName> {
-        &self.bound_queues
+    fn get_bound_queue_names(&self) -> Vec<QueueName> {
+        self.bound_queues.iter().cloned().collect()
     }
 
     fn handle_message(
@@ -58,7 +59,7 @@ impl Exchange for FanoutExchange {
         for name in queues_names {
             let msg = message.clone().unwrap();
 
-            if let Some(queue) = queues_read.get(name) {
+            if let Some(queue) = queues_read.get(&name) {
                 let queue_lock = &mut queue.lock().unwrap();
 
                 if queue_lock.len() >= QUEUE_MAX_LENGTH {
@@ -109,10 +110,9 @@ mod tests {
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("q1".to_string(), Mutex::new(Queue::new()));
-        queues_write.insert("q2".to_string(), Mutex::new(Queue::new()));
-        queues_write.insert("q3".to_string(), Mutex::new(Queue::new()));
-
+        queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("q2".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("q3".to_string(), Arc::new(Mutex::new(Queue::new())));
         drop(queues_write);
         queues
     }
@@ -165,7 +165,7 @@ mod tests {
         // arrange
         let queues = setup_test_queues();
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("_deadletter".to_string(), Mutex::new(Queue::new()));
+        queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::new())));
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
         let _ = ex.bind(&"q1".to_string());

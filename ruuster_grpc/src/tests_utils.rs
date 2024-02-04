@@ -2,12 +2,16 @@ use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
 
+use exchanges::{ExchangeName, ExchangeKind};
+use protos::ExchangeDefinition;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::{Channel, Server};
 
 use protos::ruuster_client::RuusterClient;
 use protos::ruuster_server::RuusterServer;
+
+use crate::queues::QueueName;
 
 use super::*;
 use utils::generate_random_string;
@@ -82,11 +86,12 @@ pub async fn create_exchanges(
     exchange_kind: ExchangeKind,
     should_fail: bool,
 ) {
+    let exchange_kind_id = exchange_kind as i32;
     for name in exchange_names.iter() {
         let response = client
             .exchange_declare(ExchangeDeclareRequest {
                 exchange: Some(ExchangeDefinition {
-                    kind: exchange_kind as i32,
+                    kind: exchange_kind_id,
                     exchange_name: name.to_string(),
                 }),
             })
@@ -147,6 +152,7 @@ pub async fn produce_n_random_messages(
     let mut result = vec![];
     for _ in 0..n {
         let payload = generate_random_string(100);
+        log::info!("generated payload: {}", &payload);
         result.push(payload.clone());
         let request = ProduceRequest {
             exchange_name: exchange_name.clone(),
@@ -195,10 +201,44 @@ pub async fn consume_messages(
                 &queue_name,
                 response.unwrap_err()
             );
-
             let consumed_payload = response.unwrap().into_inner().payload;
+            log::info!("consumed payload: {}", &consumed_payload);
             assert_eq!(consumed_payload, payload.to_owned());
         }
+    }
+}
+
+pub async fn consume_and_ack_messages(
+    client: &mut RuusterClient<Channel>,
+    queue_name: QueueName,
+    should_ack_fail: bool,
+    expected_message_count: u32
+) {
+    let request = ConsumeRequest { 
+        queue_name: queue_name.clone(),
+        auto_ack: false
+    };
+    let mut idx = 0u32;
+    loop {
+        let response = client.consume_one(request.clone()).await;
+        if response.is_err() {
+            assert_eq!(response.unwrap_err().code(), tonic::Code::NotFound); // there is no message left in queue
+            assert_eq!(idx, expected_message_count); // amount of messages is correct
+            return;
+        }
+        let consumed_uuid = response.unwrap().into_inner().uuid;
+            log::info!("consumed uuid: {}", &consumed_uuid);
+            let ack_request = AckRequest {
+                uuid: consumed_uuid.clone()
+            };
+            let ack_response = client.ack_message(ack_request).await;
+        if !should_ack_fail {
+            assert!(ack_response.is_ok(), "ack request for message {} failed: {}", &consumed_uuid, ack_response.unwrap_err());
+        }
+        else {
+            assert!(ack_response.is_err(), "ack request should fail");
+        }
+        idx+=1;
     }
 }
 

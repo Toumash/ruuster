@@ -1,17 +1,24 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 
 use protos::ruuster::Message;
+use types::FanoutExchange;
 
 pub mod types;
 
 pub type QueueName = String;
 pub type Queue = VecDeque<Message>;
-pub type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
+pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 
 pub type ExchangeName = String;
-pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<dyn Exchange + Send + Sync>>>;
+pub type ExchangeType = dyn Exchange + Send + Sync;
+pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
+
+#[derive(PartialEq, Debug)]
+pub enum ExchangeKind {
+    Fanout
+}
 
 #[derive(PartialEq, Debug)]
 pub enum ExchangeError {
@@ -43,10 +50,36 @@ impl fmt::Display for ExchangeError {
 
 pub trait Exchange {
     fn bind(&mut self, queue_name: &QueueName) -> Result<(), ExchangeError>;
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName>;
+    fn get_bound_queue_names(&self) -> Vec<QueueName>;
     fn handle_message(
         &self,
         message: &Option<Message>,
         queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError>;
+}
+
+impl ExchangeKind {
+    // exchanges factory
+    pub fn create(&self) -> Arc<RwLock<ExchangeType>> {
+        match self {
+            ExchangeKind::Fanout => Arc::new(RwLock::new(FanoutExchange::default())),
+        }
+    }
+}
+
+impl From<i32> for ExchangeKind {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => ExchangeKind::Fanout,
+            _ => panic!("wrong value for ExchangeKind")
+        }
+    }
+}
+
+impl Into<i32> for ExchangeKind {
+    fn into(self) -> i32 {
+        match self {
+            ExchangeKind::Fanout => 0,
+        }
+    }
 }
