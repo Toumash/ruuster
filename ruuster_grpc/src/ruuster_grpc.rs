@@ -3,7 +3,7 @@ pub mod queues;
 
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
-    ListBindingsRequest, ListBindingsResponse, ListExchangesResponse, ListQueuesResponse, Message,
+    ListExchangesResponse, ListQueuesResponse, Message,
     ProduceRequest, QueueDeclareRequest,
 };
 use queues::RuusterQueues;
@@ -111,13 +111,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         let request = request.into_inner();
         self.apply_message_ack(request.uuid)?;
         Ok(Response::new(Empty {}))
-    }
-
-    async fn list_bindings(
-        &self,
-        _request: tonic::Request<ListBindingsRequest>,
-    ) -> Result<Response<ListBindingsResponse>, Status> {
-        todo!()
     }
 }
 

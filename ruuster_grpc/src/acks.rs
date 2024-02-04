@@ -1,6 +1,14 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use protos::Message;
+use tonic::Status;
+
+use crate::queues::Uuid;
+
+pub type AckContainer = HashMap<Uuid, AckRecord>;
 
 pub struct AckRecord {
     message: Message,
@@ -18,7 +26,6 @@ pub struct AckRecord {
 
 #[derive(Debug)]
 pub enum AckStatus {
-    Ok,
     DeadlineExceeded,
 }
 
@@ -37,11 +44,12 @@ impl AckRecord {
     }
 
     pub fn is_deadline_exceeded(&self) -> bool {
-        self.timestamp + self.duration <= Instant::now()
+        self.get_deadline() <= Instant::now()
     }
 
     pub fn apply_ack(&mut self) -> Result<(), AckStatus> {
         if self.is_deadline_exceeded() {
+            log::info!("deadline exceeded for message: {}", self.get_message().uuid);
             return Err(AckStatus::DeadlineExceeded);
         }
         log::debug!("message acked: {}", self.message.uuid);
@@ -64,6 +72,40 @@ impl AckRecord {
     }
 
     pub fn get_deadline(&self) -> std::time::Instant {
-        self.timestamp + self.duration
+        *self.get_timestamp() + self.duration
+    }
+}
+
+pub trait ApplyAck {
+    fn apply_ack(&mut self, uuid: &Uuid) -> Result<(), Status>;
+    fn clear_unused_record(&mut self, uuid: &Uuid) -> Result<(), Status>;
+}
+
+impl ApplyAck for AckContainer {
+    fn clear_unused_record(&mut self, uuid: &Uuid) -> Result<(), Status> {
+        if let Some(record) = self.get(uuid) {
+            if record.get_counter() <= 0 {
+                log::debug!("deleting ack record for message with uuid: {}", uuid);
+                self.remove(uuid);
+            }
+            return Ok(());
+        }
+        let msg = format!("ack record for message with uuid: {} not found", uuid);
+        log::debug!("{}", &msg);
+        Err(Status::not_found(&msg))
+    }
+
+    fn apply_ack(&mut self, uuid: &Uuid) -> Result<(), Status> {
+        if let Some(record) = self.get_mut(uuid) {
+            record.apply_ack().map_err(|e| {
+                let msg = format!("appling ack for message failed: {:?}", e);
+                log::error!("{}", &msg);
+                Status::internal(&msg)
+            })?;
+            return Ok(());
+        }
+        let msg = format!("ack record for message with uuid: {} not found", uuid);
+        log::debug!("{}", &msg);
+        Err(Status::not_found(&msg))
     }
 }

@@ -9,14 +9,12 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
-use crate::acks::AckRecord;
+use crate::acks::{AckContainer, AckRecord, ApplyAck};
 
 pub type Uuid = String;
 pub type QueueName = String;
 pub type Queue = VecDeque<Message>;
 pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
-
-pub type AckContainer = HashMap<Uuid, AckRecord>;
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
@@ -219,28 +217,12 @@ impl RuusterQueues {
             )
         })?;
 
-        match acks.get_mut(&uuid) {
-            Some(record) => {
-                record.apply_ack().map_err(|e| {
-                    RuusterQueues::log_status(
-                        &format!("appling ack for message with id: {} failed: {:?}", &uuid, e),
-                        tonic::Code::Internal,
-                    )
-                })?;
-                if record.get_counter() <= 0 {
-                    log::debug!("deleting ack record for message with uuid: {}", &uuid);
-                    acks.remove(&uuid);
-                }
-                Ok(())
-            }
-            None => Err(RuusterQueues::log_status(
-                &"could not find requested messages ack record".to_string(),
-                tonic::Code::NotFound,
-            )),
-        }
+        acks.apply_ack(&uuid)?;
+        acks.clear_unused_record(&uuid)?;
+        Ok(())
     }
 
-    pub fn report_message(&self, message: Message, duration: Duration) -> Result<(), Status> {
+    pub fn track_message_delivery(&self, message: Message, duration: Duration) -> Result<(), Status> {
         let mut acks = self.acks.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acquire acks lock: {}", e),
@@ -277,7 +259,7 @@ impl RuusterQueues {
         match message {
             Some(msg) => {
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                self.report_message(msg.clone(), DEFAULT_ACK_DURATION)?;
+                self.track_message_delivery(msg.clone(), DEFAULT_ACK_DURATION)?;
                 return Ok(msg);
             }
             None => Err(Status::not_found("failed to return message")),
