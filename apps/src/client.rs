@@ -19,9 +19,7 @@ fn handle_menu() -> i32 {
     println!("[4] list exchanges");
     println!("[5] bind queue to exchange");
     println!("[6] publish");
-    println!("[7] start consuming");
-    println!("[8] consume one message");
-    println!("[9] consume one message (no ack)");
+    println!("[7] consume one message and acknowledge");
     println!("[0] quit");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
