@@ -7,9 +7,9 @@ use tonic::Status;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use crate::acks::{AckContainer, AckRecord, ApplyAck};
+use crate::acks::{AckContainer, ApplyAck};
 
 pub type Uuid = String;
 pub type QueueName = String;
@@ -230,13 +230,7 @@ impl RuusterQueues {
             )
         })?;
 
-        let uuid = message.uuid.to_owned();
-
-        acks.entry(uuid)
-            .and_modify(|elem| {
-                elem.increment_counter();
-            })
-            .or_insert(AckRecord::new(message, Instant::now(), duration));
+        acks.add_record(message, duration);
 
         Ok(())
     }

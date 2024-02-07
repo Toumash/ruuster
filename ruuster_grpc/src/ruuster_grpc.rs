@@ -1,4 +1,4 @@
-mod acks;
+pub mod acks;
 pub mod queues;
 
 use protos::{
