@@ -48,17 +48,17 @@ impl Exchange for DirectExchange {
 
         let msg = match message {
             Some(m) => m,
-            None => return Err(ExchangeError::EmptyPayloadFail { reason: "Empty messae".to_string() })
+            None => return Err(ExchangeError::EmptyPayloadFail { reason: "empty message".to_string() })
         };
 
-        let routing_key = match msg.header.get("route_key") {
+        let route_key = match msg.header.get("route_key") {
             Some(k) => k,
-            None => return Err(ExchangeError::EmptyPayloadFail { reason: "Empty route".to_string() })
+            None => return Err(ExchangeError::NoRouteKey)
         };
 
-        let bound_queues = match self.routings_map.get(routing_key) {
+        let bound_queues = match self.routings_map.get(route_key) {
             Some(q) => q,
-            None => return Err(ExchangeError::EmptyPayloadFail { reason: "Empty bond que".to_string() })
+            None => return Err(ExchangeError::NoMatchingQueue { route_key: String::from(route_key) } )
         };
 
         let queues_read = queues.read().unwrap();

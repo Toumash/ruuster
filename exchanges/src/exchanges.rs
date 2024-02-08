@@ -30,6 +30,8 @@ pub enum ExchangeKind {
 pub enum ExchangeError {
     BindFail { reason: String },
     EmptyPayloadFail { reason: String },
+    NoRouteKey,
+    NoMatchingQueue { route_key: String }
 }
 
 impl fmt::Display for ExchangeError {
@@ -40,6 +42,12 @@ impl fmt::Display for ExchangeError {
             }
             ExchangeError::EmptyPayloadFail { reason } => {
                 write!(f, "handling message failed: {}", reason)
+            }
+            ExchangeError::NoMatchingQueue { route_key } => {
+                write!(f ,"No matching queue for route key {}", route_key)
+            }
+            ExchangeError::NoRouteKey => {
+                write!(f, "No routing key found")
             }
         }
     }
