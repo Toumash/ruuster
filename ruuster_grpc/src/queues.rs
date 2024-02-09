@@ -222,7 +222,11 @@ impl RuusterQueues {
         Ok(())
     }
 
-    pub fn track_message_delivery(&self, message: Message, duration: Duration) -> Result<(), Status> {
+    pub fn track_message_delivery(
+        &self,
+        message: Message,
+        duration: Duration,
+    ) -> Result<(), Status> {
         let mut acks = self.acks.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acquire acks lock: {}", e),
@@ -235,7 +239,11 @@ impl RuusterQueues {
         Ok(())
     }
 
-    pub fn consume_message(&self, queue_name: &QueueName) -> Result<Message, Status> {
+    pub fn consume_message(
+        &self,
+        queue_name: &QueueName,
+        auto_ack: bool,
+    ) -> Result<Message, Status> {
         let queue = self.get_queue(queue_name)?;
 
         let message = {
@@ -253,7 +261,9 @@ impl RuusterQueues {
         match message {
             Some(msg) => {
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                self.track_message_delivery(msg.clone(), DEFAULT_ACK_DURATION)?;
+                if auto_ack {
+                    self.track_message_delivery(msg.clone(), DEFAULT_ACK_DURATION)?;
+                }
                 return Ok(msg);
             }
             None => Err(Status::not_found("failed to return message")),
@@ -261,15 +271,17 @@ impl RuusterQueues {
     }
 
     pub async fn start_consuming_task(
-        &self,
+        self_ptr: Arc<RwLock<Self>>,
         queue_name: &QueueName,
+        auto_ack: bool,
     ) -> ReceiverStream<Result<Message, Status>> {
         let (tx, rx) = mpsc::channel(4);
-        let queues = self.queues.clone();
+        let queues = self_ptr.read().unwrap().queues.clone();
         let queue_name = queue_name.clone();
 
         tokio::spawn(async move {
             loop {
+                let inner_self_ptr = self_ptr.clone();
                 let message: Option<Message> = {
                     let queues_read = queues.read().unwrap();
 
@@ -287,6 +299,18 @@ impl RuusterQueues {
                 };
 
                 if let Some(message) = message {
+                    // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
+                    let result = if !auto_ack {
+                        inner_self_ptr
+                            .read()
+                            .unwrap()
+                            .track_message_delivery(message.clone(), DEFAULT_ACK_DURATION)
+                    } else {
+                        Ok(())
+                    };
+                    if result.is_err() {
+                        return result.unwrap_err();
+                    }
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);

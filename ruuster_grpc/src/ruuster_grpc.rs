@@ -1,6 +1,9 @@
 pub mod acks;
 pub mod queues;
 
+use std::sync::Arc;
+use std::sync::RwLock;
+
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
     ListExchangesResponse, ListQueuesResponse, Message,
@@ -68,18 +71,21 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         Ok(Response::new(Empty {}))
     }
 
-    //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... low-level ;)
-    type ConsumeStream = ReceiverStream<Result<Message, Status>>;
+    type ConsumeBulkStream = ReceiverStream<Result<Message, Status>>;
 
     /**
      * this request will receive messages from specific queue and return it in form of asynchronous stream
      */
-    async fn consume(
+    async fn consume_bulk(
         &self,
         request: tonic::Request<ConsumeRequest>,
-    ) -> Result<Response<Self::ConsumeStream>, Status> {
-        let queue_name = &request.into_inner().queue_name;
-        let async_receiver = self.start_consuming_task(queue_name).await;
+    ) -> Result<Response<Self::ConsumeBulkStream>, Status> {
+        let request = request.into_inner();
+        let queue_name = &request.queue_name;
+        let auto_ack = request.auto_ack;
+        let self_ptr = Arc::new(RwLock::new(self));
+
+        let async_receiver = RuusterQueues::start_consuming_task(self_ptr, queue_name, auto_ack).await;
         Ok(Response::new(async_receiver))
     }
 
@@ -88,7 +94,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Message>, Status> {
         let request = request.into_inner();
-        let message = self.consume_message(&request.queue_name)?;
+        let message = self.consume_message(&request.queue_name, request.auto_ack)?;
         Ok(Response::new(message))
     }
 

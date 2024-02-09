@@ -9,7 +9,7 @@ service Ruuster {
     rpc ListQueues(Empty) returns (ListQueuesResponse);
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
     rpc Produce(ProduceRequest) returns (Empty);
-    rpc Consume(ConsumeRequest) returns (stream Message);
+    rpc ConsumeBulk(ConsumeRequest) returns (stream Message);
     rpc ConsumeOne(ConsumeRequest) returns (Message);
     rpc AckMessage(AckRequest) returns (Empty);
 }
