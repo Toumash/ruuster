@@ -1,4 +1,6 @@
 use std::collections::HashSet;
+use std::collections::hash_map::Entry;
+use std::default;
 use log::info;
 
 use crate::*;
@@ -12,20 +14,29 @@ pub struct DirectExchange {
 
 impl Exchange for DirectExchange {
     fn bind(&mut self, queue_name: &QueueName, metadata: &QueueMetadata) -> Result<(), ExchangeError> {
-
-        match metadata.get("route_key") {
-            Some(k) => self.routings_map
-                .entry(k.to_string())
-                .and_modify(|v| {
-                    v.insert(queue_name.to_string());
-                })
-                .or_insert(HashSet::from([queue_name.to_string()])),
+        
+        let route_key = match metadata.get("route_key") {
+            Some(k) => k,
             None => return Err(ExchangeError::BindFail { reason: "Empty routing key".to_string() })
-        }; 
+        };
 
+        match self.routings_map.entry(route_key.to_string()) {
+            Entry::Occupied(o) => {
+                let value = o.into_mut();
+                match value.get(queue_name) {
+                    Some(v) => return Err(ExchangeError::BindFail { reason: format!("Queue {} already have routing key {}", v, route_key) }),
+                    None => {
+                        value.insert(queue_name.to_string())
+                    }
+                };
+            },
+            Entry::Vacant(v) => {
+                v.insert(HashSet::from([queue_name.to_string()]));
+            }
+        };
         
         if !self.bound_queues.insert(queue_name.clone()) {
-            info!("Updating queue named: ");
+            info!("Updating queue named: {}", queue_name);
         }
 
         Ok(())
@@ -101,7 +112,7 @@ mod tests {
     fn bind_test() {
         let mut ex: DirectExchange = DirectExchange::default();
         let map = HashMap::from([
-            ("route_key".to_string(), "test".to_string())
+            ("route_key".to_string(), "route_1".to_string())
         ]);
         assert_eq!(ex.bind(&"q1".to_string(), &map), Ok(()));
         assert_eq!(ex.bind(&"q2".to_string(), &map), Ok(()));
@@ -110,7 +121,21 @@ mod tests {
     }
 
     #[test]
-    fn duplicates_bind_test() {
+    fn duplicate_queue_different_routing_bind_test() {
+        let mut ex = DirectExchange::default();
+        let map_first = HashMap::from([
+            ("route_key".to_string(), "test_1".to_string())
+        ]);
+        let map_second = HashMap::from([
+            ("route_key".to_string(), "test_2".to_string())
+        ]);
+        assert!(ex.bind(&"q1".to_string(), &map_first).is_ok());
+        assert!(ex.bind(&"q1".to_string(), &map_second).is_ok());
+        assert_eq!(ex.get_bound_queue_names().len(), 1);
+    }
+
+    #[test]
+    fn duplicate_queue_same_routing_bind_test() {
         let mut ex = DirectExchange::default();
         let map_first = HashMap::from([
             ("route_key".to_string(), "test".to_string())
@@ -118,11 +143,26 @@ mod tests {
         let map_second = HashMap::from([
             ("route_key".to_string(), "test".to_string())
         ]);
-        assert_eq!(ex.bind(&"q1".to_string(), &map_first), Ok(()));
         assert!(ex.bind(&"q1".to_string(), &map_first).is_ok());
-        assert!(ex.bind(&"q1".to_string(), &map_second).is_ok());
+        assert!(ex.bind(&"q1".to_string(), &map_second).is_err());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
     }
+
+    #[test]
+    fn different_queue_bind_test() {
+        let mut ex = DirectExchange::default();
+        let map_first = HashMap::from([
+            ("route_key".to_string(), "test".to_string())
+        ]);
+        let map_second = HashMap::from([
+            ("route_key".to_string(), "test".to_string())
+        ]);
+        assert!(ex.bind(&"q1".to_string(), &map_first).is_ok());
+        assert!(ex.bind(&"q2".to_string(), &map_first).is_ok());
+        assert_eq!(ex.get_bound_queue_names().len(), 2);
+    }
+
+    
 
     #[test]
     fn direct_exchange_test() {
