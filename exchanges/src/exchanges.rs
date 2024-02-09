@@ -5,7 +5,6 @@ use std::sync::{Arc, Mutex, RwLock};
 
 
 use protos::ruuster::Message;
-use tonic::metadata;
 use types::{FanoutExchange, DirectExchange};
 
 pub mod types;

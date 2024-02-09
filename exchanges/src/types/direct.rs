@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::collections::hash_map::Entry;
-use std::default;
 use log::info;
 
 use crate::*;
@@ -154,15 +153,10 @@ mod tests {
         let map_first = HashMap::from([
             ("route_key".to_string(), "test".to_string())
         ]);
-        let map_second = HashMap::from([
-            ("route_key".to_string(), "test".to_string())
-        ]);
         assert!(ex.bind(&"q1".to_string(), &map_first).is_ok());
         assert!(ex.bind(&"q2".to_string(), &map_first).is_ok());
         assert_eq!(ex.get_bound_queue_names().len(), 2);
     }
-
-    
 
     #[test]
     fn direct_exchange_test() {
@@ -173,10 +167,10 @@ mod tests {
         let queues = setup_test_queues();
         let mut ex = DirectExchange::default();
         let map_first = HashMap::from([
-            ("route_key".to_string(), "test".to_string())
+            ("route_key".to_string(), "test_1".to_string())
         ]);
         let map_second = HashMap::from([
-            ("route_key".to_string(), "test2".to_string())
+            ("route_key".to_string(), "test_2".to_string())
         ]);
         assert_eq!(ex.bind(&"q1".to_string(), &map_first), Ok(()));
         assert_eq!(ex.bind(&"q1".to_string(), &map_second), Ok(()));
