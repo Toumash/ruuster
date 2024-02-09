@@ -140,11 +140,24 @@ impl AckRecord {
 /// assert!(acks.apply_ack(&"teepot2".to_string()).is_ok()); // lets ack second msg
 /// assert!(acks.clear_unused_record(&"teepot2".to_string()).is_ok());
 /// assert_eq!(acks.len(), 0);
+/// 
+/// 
+/// let msg1 = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string()};
+/// let msg2 = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
+/// acks.add_record(msg1.clone(), Duration::from_millis(100));
+/// acks.add_record(msg2.clone(), Duration::from_millis(100));
+/// assert_eq!(acks.len(), 2);
+/// assert!(acks.apply_bulk_ack(&["teepot".to_string(),"teepot2".to_string()]).is_ok());
+/// assert!(acks.clear_all_unused_records().is_ok());
+/// assert_eq!(acks.len(), 0, "lipa ale wiadomo gdzie");
+/// 
 /// ```
 
 pub trait ApplyAck {
     fn apply_ack(&mut self, uuid: &Uuid) -> Result<(), Status>;
+    fn apply_bulk_ack(&mut self, uuids: &[Uuid]) -> Result<(), Status>;
     fn clear_unused_record(&mut self, uuid: &Uuid) -> Result<(), Status>;
+    fn clear_all_unused_records(&mut self) -> Result<(), Status>;
     fn add_record(&mut self, message: Message, duration: Duration);
 }
 
@@ -184,5 +197,17 @@ impl ApplyAck for AckContainer {
         let msg = format!("ack record for message with uuid: {} not found", uuid);
         log::debug!("{}", &msg);
         Err(Status::not_found(&msg))
+    }
+
+    fn apply_bulk_ack(&mut self, uuids: &[Uuid]) -> Result<(), Status> {
+        for item in uuids {
+            self.apply_ack(item)?;
+        }
+        Ok(())
+    }
+
+    fn clear_all_unused_records(&mut self) -> Result<(), Status> {
+        self.retain(|_, value| value.get_counter() > 0);
+        Ok(())
     }
 }
