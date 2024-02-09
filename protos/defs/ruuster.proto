@@ -10,7 +10,7 @@ service Ruuster {
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
     rpc ListBindings(ListBindingsRequest) returns (ListBindingsResponse);
     rpc Produce(ProduceRequest) returns (Empty);
-    rpc Consume(ConsumeRequest) returns (stream Message);
+    rpc ConsumeBulk(ConsumeRequest) returns (stream Message);
     rpc ConsumeOne(ConsumeRequest) returns (Message);
     rpc AckMessage(AckRequest) returns (Empty);
 }

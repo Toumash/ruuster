@@ -343,7 +343,7 @@ pub mod ruuster_client {
             req.extensions_mut().insert(GrpcMethod::new("ruuster.Ruuster", "Produce"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn consume(
+        pub async fn consume_bulk(
             &mut self,
             request: impl tonic::IntoRequest<super::ConsumeRequest>,
         ) -> std::result::Result<
@@ -360,9 +360,12 @@ pub mod ruuster_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static("/ruuster.Ruuster/Consume");
+            let path = http::uri::PathAndQuery::from_static(
+                "/ruuster.Ruuster/ConsumeBulk",
+            );
             let mut req = request.into_request();
-            req.extensions_mut().insert(GrpcMethod::new("ruuster.Ruuster", "Consume"));
+            req.extensions_mut()
+                .insert(GrpcMethod::new("ruuster.Ruuster", "ConsumeBulk"));
             self.inner.server_streaming(req, path, codec).await
         }
         pub async fn consume_one(
@@ -455,16 +458,19 @@ pub mod ruuster_server {
             &self,
             request: tonic::Request<super::ProduceRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
-        /// Server streaming response type for the Consume method.
-        type ConsumeStream: tonic::codegen::tokio_stream::Stream<
+        /// Server streaming response type for the ConsumeBulk method.
+        type ConsumeBulkStream: tonic::codegen::tokio_stream::Stream<
                 Item = std::result::Result<super::Message, tonic::Status>,
             >
             + Send
             + 'static;
-        async fn consume(
+        async fn consume_bulk(
             &self,
             request: tonic::Request<super::ConsumeRequest>,
-        ) -> std::result::Result<tonic::Response<Self::ConsumeStream>, tonic::Status>;
+        ) -> std::result::Result<
+            tonic::Response<Self::ConsumeBulkStream>,
+            tonic::Status,
+        >;
         async fn consume_one(
             &self,
             request: tonic::Request<super::ConsumeRequest>,
@@ -870,15 +876,15 @@ pub mod ruuster_server {
                     };
                     Box::pin(fut)
                 }
-                "/ruuster.Ruuster/Consume" => {
+                "/ruuster.Ruuster/ConsumeBulk" => {
                     #[allow(non_camel_case_types)]
-                    struct ConsumeSvc<T: Ruuster>(pub Arc<T>);
+                    struct ConsumeBulkSvc<T: Ruuster>(pub Arc<T>);
                     impl<
                         T: Ruuster,
                     > tonic::server::ServerStreamingService<super::ConsumeRequest>
-                    for ConsumeSvc<T> {
+                    for ConsumeBulkSvc<T> {
                         type Response = super::Message;
-                        type ResponseStream = T::ConsumeStream;
+                        type ResponseStream = T::ConsumeBulkStream;
                         type Future = BoxFuture<
                             tonic::Response<Self::ResponseStream>,
                             tonic::Status,
@@ -889,7 +895,7 @@ pub mod ruuster_server {
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Ruuster>::consume(&inner, request).await
+                                <T as Ruuster>::consume_bulk(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -901,7 +907,7 @@ pub mod ruuster_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = ConsumeSvc(inner);
+                        let method = ConsumeBulkSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(
