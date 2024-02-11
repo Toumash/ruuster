@@ -14,6 +14,7 @@ pub struct FanoutExchange {
 }
 
 impl FanoutExchange {
+    #[allow(dead_code)] // this is currently only used in tests
     fn new(exchange_name: String) -> Self {
         FanoutExchange {
             bound_queues: HashSet::new(),

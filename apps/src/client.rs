@@ -132,7 +132,7 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
 async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
     let request = ConsumeRequest { queue_name, auto_ack: true };
-    let mut response_stream = client.consume(request).await?.into_inner();
+    let mut response_stream = client.consume_bulk(request).await?.into_inner();
     while let Some(message) = response_stream.message().await? {
         println!("Received message: {:#?}", message);
     }
@@ -142,7 +142,7 @@ async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::
 
 async fn consume_one_message(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest{ queue_name, auto_ack: auto_ack };
+    let request = ConsumeRequest{ queue_name, auto_ack };
     let response = client.consume_one(request).await?;
     println!("Received message: {:#?}", response);
     Ok(())

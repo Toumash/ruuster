@@ -224,19 +224,11 @@ impl RuusterQueues {
     }
 
     pub fn track_message_delivery(
-        &self,
+        acks: &mut AckContainer,
         message: Message,
         duration: Duration,
     ) -> Result<(), Status> {
-        let mut acks = self.acks.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire acks lock: {}", e),
-                tonic::Code::Unavailable,
-            )
-        })?;
-
         acks.add_record(message, duration);
-
         Ok(())
     }
 
@@ -246,6 +238,12 @@ impl RuusterQueues {
         auto_ack: bool,
     ) -> Result<Message, Status> {
         let queue = self.get_queue(queue_name)?;
+        let mut acks = self.acks.write().map_err(|e| {
+            RuusterQueues::log_status(
+                &format!("failed to acquire acks lock: {}", e),
+                tonic::Code::Unavailable,
+            )
+        })?;
 
         let message = {
             queue
@@ -262,8 +260,12 @@ impl RuusterQueues {
         match message {
             Some(msg) => {
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                if auto_ack {
-                    self.track_message_delivery(msg.clone(), DEFAULT_ACK_DURATION)?;
+                if !auto_ack {
+                    RuusterQueues::track_message_delivery(
+                        &mut acks,
+                        msg.clone(),
+                        DEFAULT_ACK_DURATION,
+                    )?;
                 }
                 return Ok(msg);
             }
@@ -272,17 +274,17 @@ impl RuusterQueues {
     }
 
     pub async fn start_consuming_task(
-        self_ptr: Arc<RwLock<Self>>,
+        &self,
         queue_name: &QueueName,
         auto_ack: bool,
     ) -> ReceiverStream<Result<Message, Status>> {
         let (tx, rx) = mpsc::channel(4);
-        let queues = self_ptr.read().unwrap().queues.clone();
+        let queues = self.queues.clone();
         let queue_name = queue_name.clone();
+        let acks_arc = self.acks.clone();
 
         tokio::spawn(async move {
             loop {
-                let inner_self_ptr = self_ptr.clone();
                 let message: Option<Message> = {
                     let queues_read = queues.read().unwrap();
 
@@ -300,18 +302,26 @@ impl RuusterQueues {
                 };
 
                 if let Some(message) = message {
-                    // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                    let result = if !auto_ack {
-                        inner_self_ptr
-                            .read()
-                            .unwrap()
-                            .track_message_delivery(message.clone(), DEFAULT_ACK_DURATION)
-                    } else {
-                        Ok(())
-                    };
-                    if result.is_err() {
-                        return result.unwrap_err();
+                    {
+                        let mut acks = acks_arc.write().unwrap();
+                        if !auto_ack {
+                            // todo!("add proper error handling");
+                            let _ = RuusterQueues::track_message_delivery(
+                                &mut acks,
+                                message.clone(),
+                                DEFAULT_ACK_DURATION,
+                            );
+                        }
                     }
+                    // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
+                    // let result = if !auto_ack {
+                    //     // self.track_message_delivery(message.clone(), DEFAULT_ACK_DURATION)
+                    // } else {
+                    //     Ok(())
+                    // };
+                    // if result.is_err() {
+                    //     return result.unwrap_err();
+                    // }
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
