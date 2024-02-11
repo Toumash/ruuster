@@ -1,7 +1,6 @@
 syntax = "proto3";
 package ruuster;
 
-
 service Ruuster {
     rpc QueueDeclare(QueueDeclareRequest) returns (Empty);
     rpc ExchangeDeclare(ExchangeDeclareRequest) returns (Empty);
@@ -12,6 +11,7 @@ service Ruuster {
     rpc ConsumeBulk(ConsumeRequest) returns (stream Message);
     rpc ConsumeOne(ConsumeRequest) returns (Message);
     rpc AckMessage(AckRequest) returns (Empty);
+    rpc AckMessageBulk(AckMessageBulkRequest) returns (Empty);
 }
 
 message Empty {}
@@ -64,4 +64,8 @@ message ProduceRequest
 message AckRequest
 {
     string uuid = 1;
+}
+
+message AckMessageBulkRequest {
+    repeated string uuids = 1;
 }

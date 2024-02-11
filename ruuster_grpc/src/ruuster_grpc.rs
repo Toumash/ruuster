@@ -1,6 +1,7 @@
 pub mod acks;
 pub mod queues;
 
+use protos::AckMessageBulkRequest;
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
     ListExchangesResponse, ListQueuesResponse, Message,
@@ -113,6 +114,16 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
         self.apply_message_ack(request.uuid)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    async fn ack_message_bulk(
+        &self,
+        request: tonic::Request<AckMessageBulkRequest>
+    ) -> Result<Response<Empty>, Status>
+    {
+        let request = request.into_inner();
+        self.apply_message_bulk_ack(&request.uuids)?;
         Ok(Response::new(Empty {}))
     }
 }

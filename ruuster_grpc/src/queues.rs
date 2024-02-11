@@ -6,7 +6,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 use std::time::Duration;
 
 use crate::acks::{AckContainer, ApplyAck};
@@ -137,24 +137,6 @@ impl RuusterQueues {
             .collect())
     }
 
-    pub fn get_bindings_list(
-        &self,
-        exchange_name: &ExchangeName,
-    ) -> Result<Vec<QueueName>, Status> {
-        let exchange = self.get_exchange(exchange_name)?;
-        let exchange_read = exchange.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!(
-                    "failed to acquire exchange {} exclusive lock: {}",
-                    exchange_name, e
-                ),
-                tonic::Code::Unavailable,
-            )
-        })?;
-
-        Ok(exchange_read.get_bound_queue_names())
-    }
-
     pub fn bind_queue_to_exchange(
         &self,
         queue_name: &QueueName,
@@ -209,20 +191,33 @@ impl RuusterQueues {
         result
     }
 
-    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
-        let mut acks = self.acks.write().map_err(|e| {
+    fn get_acks(&self) -> Result<RwLockWriteGuard<'_, AckContainer>, Status> {
+        let acks = self.acks.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acquire acks lock: {}", e),
                 tonic::Code::Unavailable,
             )
         })?;
 
+        Ok(acks)
+    }
+
+    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
+        let mut acks = self.get_acks()?;
+
         acks.apply_ack(&uuid)?;
         acks.clear_unused_record(&uuid)?;
         Ok(())
     }
 
-    pub fn track_message_delivery(
+    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid]) -> Result<(), Status> {
+        let mut acks = self.get_acks()?;
+        acks.apply_bulk_ack(uuids)?;
+        acks.clear_all_unused_records()?;
+        Ok(())
+    }
+
+    fn track_message_delivery(
         acks: &mut AckContainer,
         message: Message,
         duration: Duration,
@@ -237,12 +232,7 @@ impl RuusterQueues {
         auto_ack: bool,
     ) -> Result<Message, Status> {
         let queue = self.get_queue(queue_name)?;
-        let mut acks = self.acks.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire acks lock: {}", e),
-                tonic::Code::Unavailable,
-            )
-        })?;
+        let mut acks = self.get_acks()?;
 
         let message = {
             queue
@@ -301,26 +291,16 @@ impl RuusterQueues {
                 };
 
                 if let Some(message) = message {
-                    {
+                    if !auto_ack {
                         let mut acks = acks_arc.write().unwrap();
-                        if !auto_ack {
-                            // todo!("add proper error handling");
-                            let _ = RuusterQueues::track_message_delivery(
-                                &mut acks,
-                                message.clone(),
-                                DEFAULT_ACK_DURATION,
-                            );
-                        }
+                        // TODO(msaff): add proper error handling
+                        let _ = RuusterQueues::track_message_delivery(
+                            &mut acks,
+                            message.clone(),
+                            DEFAULT_ACK_DURATION,
+                        );
                     }
-                    // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                    // let result = if !auto_ack {
-                    //     // self.track_message_delivery(message.clone(), DEFAULT_ACK_DURATION)
-                    // } else {
-                    //     Ok(())
-                    // };
-                    // if result.is_err() {
-                    //     return result.unwrap_err();
-                    // }
+                   
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
