@@ -1,10 +1,10 @@
 pub mod acks;
 pub mod queues;
 
+use protos::AckMessageBulkRequest;
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
-    ListBindingsRequest, ListBindingsResponse, ListExchangesResponse, ListQueuesResponse, Message,
-    ProduceRequest, QueueDeclareRequest,
+    ListExchangesResponse, ListQueuesResponse, Message, ProduceRequest, QueueDeclareRequest,
 };
 use queues::RuusterQueues;
 
@@ -13,7 +13,7 @@ use tonic::Response;
 use tonic::Status;
 
 #[tonic::async_trait]
-impl ruuster::ruuster_server::Ruuster for RuusterQueues{
+impl ruuster::ruuster_server::Ruuster for RuusterQueues {
     async fn queue_declare(
         &self,
         request: tonic::Request<QueueDeclareRequest>,
@@ -80,7 +80,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         let request = request.into_inner();
         let queue_name = &request.queue_name;
         let auto_ack = request.auto_ack;
-        
 
         let async_receiver = self.start_consuming_task(queue_name, auto_ack).await;
         Ok(Response::new(async_receiver))
@@ -116,11 +115,13 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         Ok(Response::new(Empty {}))
     }
 
-    async fn list_bindings(
+    async fn ack_message_bulk(
         &self,
-        _request: tonic::Request<ListBindingsRequest>,
-    ) -> Result<Response<ListBindingsResponse>, Status> {
-        todo!()
+        request: tonic::Request<AckMessageBulkRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.apply_message_bulk_ack(&request.uuids)?;
+        Ok(Response::new(Empty {}))
     }
 }
 
