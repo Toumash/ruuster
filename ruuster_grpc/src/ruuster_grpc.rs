@@ -1,9 +1,6 @@
 pub mod acks;
 pub mod queues;
 
-use std::sync::Arc;
-use std::sync::RwLock;
-
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
     ListExchangesResponse, ListQueuesResponse, Message,
@@ -83,9 +80,9 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         let request = request.into_inner();
         let queue_name = &request.queue_name;
         let auto_ack = request.auto_ack;
-        let self_ptr = Arc::new(RwLock::new(self));
+        
 
-        let async_receiver = RuusterQueues::start_consuming_task(self_ptr, queue_name, auto_ack).await;
+        let async_receiver = self.start_consuming_task(queue_name, auto_ack).await;
         Ok(Response::new(async_receiver))
     }
 
