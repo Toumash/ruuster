@@ -71,7 +71,10 @@ impl From<i32> for ExchangeKind {
     fn from(value: i32) -> Self {
         match value {
             0 => ExchangeKind::Fanout,
-            _ => panic!("wrong value for ExchangeKind")
+            wrong_value => {
+                log::error!("value {} is not correct ExchangeKind, will use Fanout", wrong_value);
+                ExchangeKind::Fanout
+            }
         }
     }
 }
