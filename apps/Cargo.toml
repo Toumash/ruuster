@@ -16,6 +16,7 @@ path = "./src/server.rs"
 [dependencies]
 log = "0.4.20"
 tonic = "0.10.2"
+tonic-reflection = "0.10.2"
 tokio = { version = "1.34.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1.14"
 uuid = { version = "1.6.1", features = ["v4"]}

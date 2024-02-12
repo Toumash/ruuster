@@ -1,0 +1,67 @@
+
+ì
+ruuster.protoruuster"
+Empty"¨
+Message
+uuid (	Ruuid4
+header (2.ruuster.Message.HeaderEntryRheader
+payload (	Rpayload9
+HeaderEntry
+key (	Rkey
+value (	Rvalue:8"M
+ExchangeDefinition
+kind (Rkind#
+exchange_name (	RexchangeName"4
+QueueDeclareRequest
+
+queue_name (	R	queueName"Q
+ExchangeDeclareRequest7
+exchange (2.ruuster.ExchangeDefinitionRexchange"ä
+BindQueueToExchangeRequestG
+header (2/.ruuster.BindQueueToExchangeRequest.HeaderEntryRheader#
+exchange_name (	RexchangeName
+
+queue_name (	R	queueName9
+HeaderEntry
+key (	Rkey
+value (	Rvalue:8"5
+ListQueuesResponse
+queue_names (	R
+queueNames">
+ListExchangesResponse%
+exchange_names (	RexchangeNames":
+ListBindingsRequest#
+exchange_name (	RexchangeName"7
+ListBindingsResponse
+queue_names (	R
+queueNames"J
+ConsumeRequest
+
+queue_name (	R	queueName
+auto_ack (RautoAck"Ù
+ProduceRequest;
+header (2#.ruuster.ProduceRequest.HeaderEntryRheader#
+exchange_name (	RexchangeName*
+payload (2.ruuster.MessageRpayload9
+HeaderEntry
+key (	Rkey
+value (	Rvalue:8" 
+
+AckRequest
+uuid (	Ruuid"-
+AckMessageBulkRequest
+uuids (	Ruuids2ñ
+Ruuster<
+QueueDeclare.ruuster.QueueDeclareRequest.ruuster.EmptyB
+ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.EmptyJ
+BindQueueToExchange#.ruuster.BindQueueToExchangeRequest.ruuster.Empty9
+
+ListQueues.ruuster.Empty.ruuster.ListQueuesResponse?
+ListExchanges.ruuster.Empty.ruuster.ListExchangesResponse2
+Produce.ruuster.ProduceRequest.ruuster.Empty:
+ConsumeBulk.ruuster.ConsumeRequest.ruuster.Message07
+
+ConsumeOne.ruuster.ConsumeRequest.ruuster.Message1
+
+AckMessage.ruuster.AckRequest.ruuster.Empty@
+AckMessageBulk.ruuster.AckMessageBulkRequest.ruuster.Emptybproto3
