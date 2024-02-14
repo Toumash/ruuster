@@ -79,9 +79,9 @@ impl From<i32> for ExchangeKind {
     }
 }
 
-impl Into<i32> for ExchangeKind {
-    fn into(self) -> i32 {
-        match self {
+impl From<ExchangeKind> for i32 {
+    fn from(value: ExchangeKind) -> Self {
+        match value {
             ExchangeKind::Fanout => 0,
         }
     }

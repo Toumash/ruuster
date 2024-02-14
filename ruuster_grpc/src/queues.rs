@@ -24,6 +24,12 @@ pub struct RuusterQueues {
 
 const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
 
+impl Default for RuusterQueues {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RuusterQueues {
     pub fn new() -> Self {
         RuusterQueues {
@@ -333,7 +339,7 @@ impl RuusterQueues {
                 }
             }
         });
-        return ReceiverStream::new(rx);
+        ReceiverStream::new(rx)
     }
 
     fn log_status(message: &String, code: tonic::Code) -> Status {
