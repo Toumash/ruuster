@@ -7,10 +7,6 @@ use types::FanoutExchange;
 
 pub mod types;
 
-pub type QueueName = String;
-pub type Queue = VecDeque<Message>;
-pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
-
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
