@@ -1,5 +1,5 @@
 
-‡
+Å
 ruuster.protoruuster"
 Empty"7
 Message
@@ -28,12 +28,16 @@ queue_name (	R	queueName
 auto_ack (RautoAck"a
 ProduceRequest#
 exchange_name (	RexchangeName*
-payload (2.ruuster.MessageRpayload" 
+payload (2.ruuster.MessageRpayload"?
 
 AckRequest
-uuid (	Ruuid"-
+uuid (	Ruuid
+
+queue_name (	R	queueName"L
 AckMessageBulkRequest
-uuids (	Ruuids2ñ
+uuids (	Ruuids
+
+queue_name (	R	queueName2ñ
 Ruuster<
 QueueDeclare.ruuster.QueueDeclareRequest.ruuster.EmptyB
 ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.EmptyJ

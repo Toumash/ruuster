@@ -64,8 +64,10 @@ message ProduceRequest
 message AckRequest
 {
     string uuid = 1;
+    string queue_name = 2;
 }
 
 message AckMessageBulkRequest {
     repeated string uuids = 1;
+    string queue_name = 2;
 }

@@ -4,10 +4,10 @@ use std::time::Duration;
 use tonic::transport::Channel;
 use uuid::Uuid;
 
-use ruuster::{ruuster_client::RuusterClient, Empty, ConsumeRequest, QueueDeclareRequest};
+use ruuster::{ruuster_client::RuusterClient, ConsumeRequest, Empty, QueueDeclareRequest};
 use ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
 
-use protos::{ruuster, AckMessageBulkRequest};
+use protos::{ruuster, AckMessageBulkRequest, AckRequest};
 use utils::console_input;
 
 fn handle_menu() -> i32 {
@@ -124,18 +124,27 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-async fn listen(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn listen(
+    client: &mut RuusterClient<Channel>,
+    auto_ack: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest { queue_name, auto_ack };
+    let request = ConsumeRequest {
+        queue_name: queue_name.clone(),
+        auto_ack,
+    };
     let mut response_stream = client.consume_bulk(request).await?.into_inner();
     let mut uuids = vec![];
     while let Some(message) = response_stream.message().await? {
-        uuids.push(message.uuid.clone());
+        if !auto_ack {
+            uuids.push(message.uuid.clone());
+        }
         println!("Received message: {:#?}", message);
         std::thread::sleep(Duration::from_millis(300)); // just to make debugging easier
-        if uuids.len() == 25 {
+        if !auto_ack && uuids.len() == 25 {
             let ack_request = AckMessageBulkRequest {
-                uuids: uuids.clone()
+                uuids: uuids.clone(),
+                queue_name: queue_name.clone(),
             };
             client.ack_message_bulk(ack_request).await?;
             println!("Acked bunch of messages");
@@ -146,11 +155,26 @@ async fn listen(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(
     Ok(())
 }
 
-async fn consume_one_message(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn consume_one_message(
+    client: &mut RuusterClient<Channel>,
+    auto_ack: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest{ queue_name, auto_ack };
+    let request = ConsumeRequest {
+        queue_name: queue_name.clone(),
+        auto_ack,
+    };
     let response = client.consume_one(request).await?;
-    println!("Received message: {:#?}", response);
+    println!("Received message: {:#?}", &response);
+
+    if !auto_ack {
+        let ack_request = AckRequest {
+            uuid: response.into_inner().uuid,
+            queue_name
+        };
+        println!("acking single message: {}", &ack_request.uuid);
+        client.ack_message(ack_request).await?;
+    }
     Ok(())
 }
 

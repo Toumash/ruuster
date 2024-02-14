@@ -1,9 +1,10 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use protos::ruuster::Message;
 use types::FanoutExchange;
+use common::{QueueContainer, QueueName};
 
 pub mod types;
 
@@ -50,7 +51,7 @@ pub trait Exchange {
     fn handle_message(
         &self,
         message: &Option<Message>,
-        queues: Arc<RwLock<QueueContainer>>,
+        queues: &QueueContainer,
     ) -> Result<u32, ExchangeError>;
 }
 

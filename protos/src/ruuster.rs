@@ -70,12 +70,16 @@ pub struct ProduceRequest {
 pub struct AckRequest {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub queue_name: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct AckMessageBulkRequest {
     #[prost(string, repeated, tag = "1")]
     pub uuids: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(string, tag = "2")]
+    pub queue_name: ::prost::alloc::string::String,
 }
 /// Generated client implementations.
 pub mod ruuster_client {

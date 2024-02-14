@@ -6,7 +6,7 @@ use std::{
 use protos::Message;
 use tonic::Status;
 
-use crate::queues::Uuid;
+use common::Uuid;
 
 pub type AckContainer = HashMap<Uuid, AckRecord>;
 

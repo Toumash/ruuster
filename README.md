@@ -11,7 +11,7 @@
 
 ```rs
 # to run the server
-cargo watch -x 'run --bin server'
+cargo run --bin server
 
 # to run the client
 cargo run --bin client
@@ -27,5 +27,6 @@ cargo run --bin client
 | ruuster-qrpc | library that will contain implementation of gRPC server         |
 | utils        | library with common utilities                                   |
 | apps         | crate containing binaries built using our project               |
+| common       | library with types common across system                         |
 
 

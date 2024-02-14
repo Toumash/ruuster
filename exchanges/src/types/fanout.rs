@@ -40,7 +40,7 @@ impl Exchange for FanoutExchange {
     fn handle_message(
         &self,
         message: &Option<Message>,
-        queues: Arc<RwLock<QueueContainer>>,
+        queues: &QueueContainer,
     ) -> Result<u32, ExchangeError> {
         if message.is_none() {
             return Err(ExchangeError::EmptyPayloadFail {
@@ -53,20 +53,20 @@ impl Exchange for FanoutExchange {
             .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
 
         let queues_names = self.get_bound_queue_names();
-        let queues_read = queues.read().unwrap();
+        // let queues_read = queues.read().unwrap();
 
         let mut pushed_counter: u32 = 0;
 
         for name in queues_names {
             let msg = message.clone().unwrap();
 
-            if let Some(queue) = queues_read.get(&name) {
+            if let Some(queue) = queues.get(&name) {
                 let queue_lock = &mut queue.lock().unwrap();
 
-                if queue_lock.len() >= QUEUE_MAX_LENGTH {
+                if queue_lock.get_data().len() >= QUEUE_MAX_LENGTH {
                     log::warn!("queue size reached for queue {}", name);
 
-                    if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
+                    if let Some(dead_letter_queue) = queues.get(DEADLETTER_QUEUE_NAME) {
                         // FIXME: use the deadletter queue defined per exchange
                         log::debug!("moving the message {} to the dead letter queue", msg.uuid);
 
@@ -84,6 +84,7 @@ impl Exchange for FanoutExchange {
                         dead_letter_queue
                             .lock()
                             .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
+                            .get_mut_data()
                             .push_back(Message {
                                 uuid: msg.uuid,
                                 payload: val,
@@ -92,7 +93,7 @@ impl Exchange for FanoutExchange {
                         log::debug!("message {} dropped", msg.uuid);
                     }
                 } else {
-                    queue_lock.push_back(message.clone().unwrap());
+                    queue_lock.get_mut_data().push_back(message.clone().unwrap());
                     pushed_counter += 1;
                 }
             }
@@ -105,15 +106,17 @@ impl Exchange for FanoutExchange {
 #[cfg(test)]
 mod tests {
     use uuid::Uuid;
+    use std::sync::Mutex;
+    use common::Queue;
 
     use super::*;
 
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::new())));
-        queues_write.insert("q2".to_string(), Arc::new(Mutex::new(Queue::new())));
-        queues_write.insert("q3".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::default())));
+        queues_write.insert("q2".to_string(), Arc::new(Mutex::new(Queue::default())));
+        queues_write.insert("q3".to_string(), Arc::new(Mutex::new(Queue::default())));
         drop(queues_write);
         queues
     }
@@ -150,14 +153,16 @@ mod tests {
             payload: "#abadcaffe".to_string(),
         });
 
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        let queues_inner = queues.read().unwrap();
+
+        assert_eq!(ex.handle_message(&message, & queues_inner), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, &mut &queues_inner), Ok(3u32));
+        assert_eq!(ex.handle_message(&message, &mut &queues_inner), Ok(3u32));
 
         let queues_read = queues.read().unwrap();
         for (_, queue_mutex) in queues_read.iter() {
             let queue = queue_mutex.lock().unwrap();
-            assert_eq!(queue.len(), 3, "Queue does not have exactly 3 messages");
+            assert_eq!(queue.get_data().len(), 3, "Queue does not have exactly 3 messages");
         }
     }
 
@@ -166,10 +171,12 @@ mod tests {
         // arrange
         let queues = setup_test_queues();
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::default())));
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
         let _ = ex.bind(&"q1".to_string());
+
+        let queues_inner = queues.read().unwrap();
 
         // add the messages up to the limit
         for _ in 1..=1000 {
@@ -179,7 +186,7 @@ mod tests {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
                     })),
-                    queues.clone(),
+                    &mut &queues_inner,
                 )
                 .unwrap();
         }
@@ -191,15 +198,15 @@ mod tests {
 
         // act
         let _ = ex
-            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .handle_message(&(Some(one_too_many_message.clone())), &mut &queues_inner)
             .unwrap();
 
         // assert
         let queues_read = queues.read().unwrap();
         let dead_letter_queue = &queues_read["_deadletter"];
-        assert_eq!(dead_letter_queue.lock().unwrap().len(), 1, "messages should be places into the dead letter queue after the capacity of a queue has been exhausted");
+        assert_eq!(dead_letter_queue.lock().unwrap().get_data().len(), 1, "messages should be places into the dead letter queue after the capacity of a queue has been exhausted");
         assert_eq!(
-            dead_letter_queue.lock().unwrap().pop_front().unwrap().uuid,
+            dead_letter_queue.lock().unwrap().get_mut_data().pop_front().unwrap().uuid,
             one_too_many_message.uuid
         );
     }
@@ -216,6 +223,8 @@ mod tests {
         let mut ex = FanoutExchange::new("fanout_test".into());
         let _ = ex.bind(&"q1".to_string());
 
+        let queues_inner = queues.read().unwrap();
+
         // add the messages up to the limit
         for _ in 1..=1000 {
             let _ = ex
@@ -224,7 +233,7 @@ mod tests {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
                     })),
-                    queues.clone(),
+                    &mut &queues_inner,
                 )
                 .unwrap();
         }
@@ -236,7 +245,7 @@ mod tests {
 
         // act
         let message_handled_by_queues_count = ex
-            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .handle_message(&(Some(one_too_many_message.clone())), &mut &queues_inner)
             .unwrap();
 
         // assert

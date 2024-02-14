@@ -11,7 +11,7 @@ use tonic::transport::{Channel, Server};
 use protos::ruuster_client::RuusterClient;
 use protos::ruuster_server::RuusterServer;
 
-use crate::queues::QueueName;
+use common::QueueName;
 
 use super::*;
 use utils::generate_random_string;
@@ -229,7 +229,8 @@ pub async fn consume_and_ack_messages(
         let consumed_uuid = response.unwrap().into_inner().uuid;
             log::info!("consumed uuid: {}", &consumed_uuid);
             let ack_request = AckRequest {
-                uuid: consumed_uuid.clone()
+                uuid: consumed_uuid.clone(),
+                queue_name: queue_name.clone()
             };
             let ack_response = client.ack_message(ack_request).await;
         if !should_ack_fail {

@@ -1,3 +1,4 @@
+use common::{Queue, QueueContainer, QueueName, Uuid};
 use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
 use protos::Message;
 
@@ -5,24 +6,24 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
-use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
 use std::time::Duration;
 
 use crate::acks::{AckContainer, ApplyAck};
 
-pub type Uuid = String;
-pub type QueueName = String;
-pub type Queue = VecDeque<Message>;
-pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
+const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
+
+#[derive(Debug)]
+enum ForwardingMessageErr {
+    NoMessageOnQueue,
+    PrefetchCountExceeded,
+}
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
     exchanges: Arc<RwLock<ExchangeContainer>>,
     acks: Arc<RwLock<AckContainer>>,
 }
-
-const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
 
 impl Default for RuusterQueues {
     fn default() -> Self {
@@ -55,8 +56,11 @@ impl RuusterQueues {
             ));
         }
 
-        queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
-        
+        queues_write.insert(
+            queue_name.to_owned(),
+            Arc::new(Mutex::new(Queue::default())),
+        );
+
         log::debug!("queue: {} added", &queue_name);
         Ok(())
     }
@@ -153,7 +157,11 @@ impl RuusterQueues {
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
     ) -> Result<(), Status> {
-        log::debug!("binding queue: {} to exchange: {}", queue_name, exchange_name);
+        log::debug!(
+            "binding queue: {} to exchange: {}",
+            queue_name,
+            exchange_name
+        );
         let exchange = self.get_exchange(exchange_name)?;
         let mut exchange_write = exchange.write().map_err(|e| {
             RuusterQueues::log_status(
@@ -173,7 +181,11 @@ impl RuusterQueues {
                 tonic::Code::Internal,
             )
         })?;
-        log::debug!("binding queue: {} to exchange: {} completed", queue_name, exchange_name);
+        log::debug!(
+            "binding queue: {} to exchange: {} completed",
+            queue_name,
+            exchange_name
+        );
         Ok(())
     }
 
@@ -182,11 +194,15 @@ impl RuusterQueues {
         message: &Option<Message>,
         exchange_name: &ExchangeName,
     ) -> Result<u32, Status> {
-        let uuid = match message.as_ref(){
+        let uuid = match message.as_ref() {
             Some(msg) => &msg.uuid,
             None => "N/A",
         };
-        log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
+        log::debug!(
+            "forwarding message with uuid: {} to exchange: {}",
+            uuid,
+            exchange_name
+        );
         let exchange = self.get_exchange(exchange_name)?;
 
         let result = {
@@ -197,16 +213,20 @@ impl RuusterQueues {
                 )
             })?;
 
-            exchange_read
-                .handle_message(message, self.queues.clone())
-                .map_err(|e| {
-                    RuusterQueues::log_status(
-                        &format!("failed to handle message: {}", e),
-                        tonic::Code::Internal,
-                    )
-                })
+            let queues = self.queues.read().unwrap();
+
+            exchange_read.handle_message(message, &queues).map_err(|e| {
+                RuusterQueues::log_status(
+                    &format!("failed to handle message: {}", e),
+                    tonic::Code::Internal,
+                )
+            })
         };
-        log::debug!("message forwarding completed (uuid: {}, echange: {})", uuid, exchange_name);
+        log::debug!(
+            "message forwarding completed (uuid: {}, echange: {})",
+            uuid,
+            exchange_name
+        );
         result
     }
 
@@ -221,22 +241,40 @@ impl RuusterQueues {
         Ok(acks)
     }
 
-    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
+    pub fn apply_message_ack(&self, uuid: Uuid, queue_name: &QueueName) -> Result<(), Status> {
         log::debug!("single message ack for msg with uuid: {}", &uuid);
         let mut acks = self.get_acks()?;
 
         acks.apply_ack(&uuid)?;
         acks.clear_unused_record(&uuid)?;
+
+        let queue_arc = self.get_queue(queue_name)?;
+        let _ = queue_arc.lock().and_then(|mut queue| {
+            queue.decrement_prefetched(1);
+            Ok(queue)
+        });
+
+
         log::debug!("ack for message with uuid: {} completed", &uuid);
         Ok(())
     }
 
-    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid]) -> Result<(), Status> {
+    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid], queue_name: &QueueName) -> Result<(), Status> {
         log::debug!("acking multiple messages");
         let mut acks = self.get_acks()?;
         acks.apply_bulk_ack(uuids)?;
         acks.clear_all_unused_records()?;
-        log::debug!("acking multiple messages completed, acked uuids: {:#?}", uuids);
+
+        let queue_arc = self.get_queue(queue_name)?;
+        let _ = queue_arc.lock().and_then(|mut queue| {
+            queue.decrement_prefetched(uuids.len());
+            Ok(queue)
+        });
+
+        log::debug!(
+            "acking multiple messages completed, acked uuids: {:#?}",
+            uuids
+        );
         Ok(())
     }
 
@@ -255,24 +293,38 @@ impl RuusterQueues {
         queue_name: &QueueName,
         auto_ack: bool,
     ) -> Result<Message, Status> {
-        log::debug!("started consuming single message from queue: {}", queue_name);
+        log::debug!(
+            "started consuming single message from queue: {}",
+            queue_name
+        );
         let queue = self.get_queue(queue_name)?;
         let mut acks = self.get_acks()?;
 
         let message = {
-            queue
-                .lock()
-                .map_err(|e| {
-                    RuusterQueues::log_status(
-                        &format!("failed to acuire queue lock: {}", e),
-                        tonic::Code::Unavailable,
-                    )
-                })?
-                .pop_front()
+            let mut queue_inner = queue.lock().map_err(|e| {
+                RuusterQueues::log_status(
+                    &format!("failed to acuire queue lock: {}", e),
+                    tonic::Code::Unavailable,
+                )
+            })?;
+
+            if queue_inner.is_prefetch_full() && !auto_ack {
+                Err(ForwardingMessageErr::PrefetchCountExceeded)
+            } else {
+                let msg = queue_inner.get_mut_data().pop_front();
+
+                match msg {
+                    Some(msg) => {
+                        queue_inner.increment_prefetched();
+                        Ok(msg)
+                    }
+                    None => Err(ForwardingMessageErr::NoMessageOnQueue),
+                }
+            }
         };
 
         match message {
-            Some(msg) => {
+            Ok(msg) => {
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
                 if !auto_ack {
                     RuusterQueues::track_message_delivery(
@@ -281,10 +333,16 @@ impl RuusterQueues {
                         DEFAULT_ACK_DURATION,
                     )?;
                 }
-                log::debug!("consuming single message from queue: {} completed", queue_name);
+                log::debug!(
+                    "consuming single message from queue: {} completed",
+                    queue_name
+                );
                 Ok(msg)
             }
-            None => Err(Status::not_found("failed to return message")),
+            Err(e) => Err(Status::not_found(&format!(
+                "failed to return message: {:?}",
+                e
+            ))),
         }
     }
 
@@ -311,10 +369,11 @@ impl RuusterQueues {
                             log::error!("{}", msg);
                             return Status::not_found(msg);
                         }
-                    };
+                    }
+                    .clone();
 
                     let mut queue = requested_queue.lock().unwrap();
-                    queue.pop_front()
+                    queue.get_mut_data().pop_front()
                 };
 
                 if let Some(message) = message {
@@ -327,13 +386,16 @@ impl RuusterQueues {
                             DEFAULT_ACK_DURATION,
                         );
                     }
-                   
+
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
                         return Status::internal(msg);
                     }
-                    log::debug!("message from queue: {} correclty sent over channel", queue_name);
+                    log::debug!(
+                        "message from queue: {} correclty sent over channel",
+                        queue_name
+                    );
                 } else {
                     tokio::task::yield_now().await;
                 }

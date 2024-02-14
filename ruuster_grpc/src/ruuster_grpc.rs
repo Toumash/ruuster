@@ -113,7 +113,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         request: tonic::Request<AckRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        self.apply_message_ack(request.uuid)?;
+        self.apply_message_ack(request.uuid, &request.queue_name)?;
         Ok(Response::new(Empty {}))
     }
 
@@ -123,7 +123,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
     ) -> Result<Response<Empty>, Status>
     {
         let request = request.into_inner();
-        self.apply_message_bulk_ack(&request.uuids)?;
+        self.apply_message_bulk_ack(&request.uuids, &request.queue_name)?;
         Ok(Response::new(Empty {}))
     }
 }
