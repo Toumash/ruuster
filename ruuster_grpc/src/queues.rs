@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crate::acks::{AckContainer, ApplyAck};
 
-const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
+const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(1);
 
 #[derive(Debug)]
 enum ForwardingMessageErr {
@@ -254,12 +254,15 @@ impl RuusterQueues {
             Ok(queue)
         });
 
-
         log::debug!("ack for message with uuid: {} completed", &uuid);
         Ok(())
     }
 
-    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid], queue_name: &QueueName) -> Result<(), Status> {
+    pub fn apply_message_bulk_ack(
+        &self,
+        uuids: &[Uuid],
+        queue_name: &QueueName,
+    ) -> Result<(), Status> {
         log::debug!("acking multiple messages");
         let mut acks = self.get_acks()?;
         acks.apply_bulk_ack(uuids)?;
@@ -308,7 +311,7 @@ impl RuusterQueues {
                 )
             })?;
 
-            if queue_inner.is_prefetch_full() && !auto_ack {
+            if !auto_ack && queue_inner.is_prefetch_full() {
                 Err(ForwardingMessageErr::PrefetchCountExceeded)
             } else {
                 let msg = queue_inner.get_mut_data().pop_front();
@@ -359,7 +362,7 @@ impl RuusterQueues {
 
         tokio::spawn(async move {
             loop {
-                let message: Option<Message> = {
+                let message: Result<Message, ForwardingMessageErr> = {
                     let queues_read = queues.read().unwrap();
 
                     let requested_queue = match queues_read.get(&queue_name) {
@@ -372,32 +375,47 @@ impl RuusterQueues {
                     }
                     .clone();
 
-                    let mut queue = requested_queue.lock().unwrap();
-                    queue.get_mut_data().pop_front()
+                    let mut queue_inner = requested_queue.lock().unwrap();
+                    if !auto_ack && queue_inner.is_prefetch_full() {
+                        Err(ForwardingMessageErr::PrefetchCountExceeded)
+                    } else {
+                        let msg = queue_inner.get_mut_data().pop_front();
+
+                        match msg {
+                            Some(msg) => {
+                                queue_inner.increment_prefetched();
+                                Ok(msg)
+                            }
+                            None => Err(ForwardingMessageErr::NoMessageOnQueue),
+                        }
+                    }
                 };
 
-                if let Some(message) = message {
-                    if !auto_ack {
-                        let mut acks = acks_arc.write().unwrap();
-                        // TODO(msaff): add proper error handling
-                        let _ = RuusterQueues::track_message_delivery(
-                            &mut acks,
-                            message.clone(),
-                            DEFAULT_ACK_DURATION,
+                match message {
+                    Ok(msg) => {
+                        if !auto_ack {
+                            let mut acks = acks_arc.write().unwrap();
+                            // TODO(msaff): add proper error handling
+                            let _ = RuusterQueues::track_message_delivery(
+                                &mut acks,
+                                msg.clone(),
+                                DEFAULT_ACK_DURATION,
+                            );
+                        }
+
+                        if let Err(e) = tx.send(Ok(msg)).await {
+                            let msg = format!("error while sending message to channel: {}", e);
+                            log::error!("{}", msg);
+                            return Status::internal(msg);
+                        }
+                        log::debug!(
+                            "message from queue: {} correclty sent over channel",
+                            queue_name
                         );
                     }
-
-                    if let Err(e) = tx.send(Ok(message)).await {
-                        let msg = format!("error while sending message to channel: {}", e);
-                        log::error!("{}", msg);
-                        return Status::internal(msg);
+                    Err(_) => {
+                        tokio::task::yield_now().await;
                     }
-                    log::debug!(
-                        "message from queue: {} correclty sent over channel",
-                        queue_name
-                    );
-                } else {
-                    tokio::task::yield_now().await;
                 }
             }
         });

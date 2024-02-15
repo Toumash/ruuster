@@ -140,8 +140,9 @@ async fn listen(
             uuids.push(message.uuid.clone());
         }
         println!("Received message: {:#?}", message);
-        std::thread::sleep(Duration::from_millis(300)); // just to make debugging easier
-        if !auto_ack && uuids.len() == 25 {
+        tokio::time::sleep(Duration::from_micros(100)).await;
+        // std::thread::sleep(Duration::from_secs(1)); // just to make debugging easier
+        if !auto_ack && uuids.len() == 10 {
             let ack_request = AckMessageBulkRequest {
                 uuids: uuids.clone(),
                 queue_name: queue_name.clone(),
