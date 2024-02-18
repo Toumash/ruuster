@@ -1,5 +1,4 @@
 use std::io;
-use std::time::Duration;
 
 use tonic::transport::Channel;
 use uuid::Uuid;
@@ -19,7 +18,10 @@ fn handle_menu() -> i32 {
     println!("[4] list exchanges");
     println!("[5] bind queue to exchange");
     println!("[6] publish");
-    println!("[7] consume one message and acknowledge");
+    println!("[7] start consuming");
+    println!("[8] start consuming (auto ack)");
+    println!("[9] consume one message");
+    println!("[10] consume one message (auto ack)");
     println!("[0] quit");
     let mut buffer = String::new();
     io::stdin().read_line(&mut buffer).unwrap();
@@ -138,7 +140,6 @@ async fn listen(
             uuids.push(message.uuid.clone());
         }
         println!("Received message: {:#?}", message);
-        tokio::time::sleep(Duration::from_micros(100)).await;
         // std::thread::sleep(Duration::from_secs(1)); // just to make debugging easier
         if !auto_ack && uuids.len() == 10 {
             let ack_request = AckMessageBulkRequest {
@@ -191,8 +192,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             5 => bind_queue(&mut client).await,
             6 => produce(&mut client).await,
             7 => listen(&mut client, false).await,
-            8 => consume_one_message(&mut client, true).await,
+            8 => listen(&mut client, true).await,
             9 => consume_one_message(&mut client, false).await,
+            10 => consume_one_message(&mut client, true).await,
             0 => return Ok(()),
             _ => return Err("wrong menu option".into()),
         };
