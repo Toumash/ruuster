@@ -57,7 +57,7 @@ impl Tui {
     }
 
     pub fn draw(&mut self, app: &mut App) -> Result<()> {
-        self.terminal.draw(|frame| ui::render(app, frame))?;
+        self.terminal.draw(|frame| ui::render_user_name_input(app, frame))?;
         Ok(())
     }
 }

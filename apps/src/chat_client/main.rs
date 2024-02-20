@@ -9,7 +9,7 @@ use color_eyre::Result;
 use event::{Event, EventHandler};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use tui::Tui;
-use update::update;
+use update::update_user_name_input;
 
 fn main() -> Result<()> {
     let mut app = App::new();
@@ -21,13 +21,13 @@ fn main() -> Result<()> {
     let mut tui = Tui::new(terminal, events);
     tui.enter()?;
 
-    while !app.should_quit {
+    while !app.is_done() {
         // Render the user interface.
         tui.draw(&mut app)?;
         // Handle events.
         match tui.events.next()? {
             Event::Tick => {}
-            Event::Key(key_event) => update(&mut app, key_event),
+            Event::Key(key_event) => update_user_name_input(&mut app, key_event),
             Event::Mouse(_) => {}
             Event::Resize(_, _) => {}
         };

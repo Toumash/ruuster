@@ -1,17 +1,31 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::App;
+use crate::app::{App, AppState};
 
-pub fn update(app: &mut App, key_event: KeyEvent) {
+pub fn update_user_name_input(app: &mut App, key_event: KeyEvent) {
     match key_event.code {
-        KeyCode::Esc | KeyCode::Char('q') => app.quit(),
+        KeyCode::Esc => app.quit(),
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
                 app.quit()
             }
+            else {
+                
+            }
         }
-        KeyCode::Right | KeyCode::Char('j') => app.increment_counter(),
-        KeyCode::Left | KeyCode::Char('k') => app.decrement_counter(),
+        KeyCode::Char(key) => {
+            app.user_name.push(key);
+        }
+        KeyCode::Backspace => {
+            app.user_name.pop();
+        }
+        KeyCode::Enter => {
+            app.state = AppState::Running;
+        }
         _ => {}
     };
+}
+
+pub fn update_chat_input(app: &mut App, key_event: KeyEvent) {
+    todo!()
 }
