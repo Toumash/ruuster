@@ -1,6 +1,7 @@
-mod acks;
+pub mod acks;
 pub mod queues;
 
+use protos::AckMessageBulkRequest;
 use protos::{
     ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
     ListExchangesResponse, ListQueuesResponse, Message,
@@ -68,18 +69,21 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         Ok(Response::new(Empty {}))
     }
 
-    //NOTICE(msaff): this is not an only option, if it will not be good enough we can always change it to smoething more... low-level ;)
-    type ConsumeStream = ReceiverStream<Result<Message, Status>>;
+    type ConsumeBulkStream = ReceiverStream<Result<Message, Status>>;
 
     /**
      * this request will receive messages from specific queue and return it in form of asynchronous stream
      */
-    async fn consume(
+    async fn consume_bulk(
         &self,
         request: tonic::Request<ConsumeRequest>,
-    ) -> Result<Response<Self::ConsumeStream>, Status> {
-        let queue_name = &request.into_inner().queue_name;
-        let async_receiver = self.start_consuming_task(queue_name).await;
+    ) -> Result<Response<Self::ConsumeBulkStream>, Status> {
+        let request = request.into_inner();
+        let queue_name = &request.queue_name;
+        let auto_ack = request.auto_ack;
+        
+
+        let async_receiver = self.start_consuming_task(queue_name, auto_ack).await;
         Ok(Response::new(async_receiver))
     }
 
@@ -88,7 +92,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Message>, Status> {
         let request = request.into_inner();
-        let message = self.consume_message(&request.queue_name)?;
+        let message = self.consume_message(&request.queue_name, request.auto_ack)?;
         Ok(Response::new(message))
     }
 
@@ -109,7 +113,17 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         request: tonic::Request<AckRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        self.apply_message_ack(request.uuid)?;
+        self.apply_message_ack(request.uuid, &request.queue_name)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    async fn ack_message_bulk(
+        &self,
+        request: tonic::Request<AckMessageBulkRequest>
+    ) -> Result<Response<Empty>, Status>
+    {
+        let request = request.into_inner();
+        self.apply_message_bulk_ack(&request.uuids, &request.queue_name)?;
         Ok(Response::new(Empty {}))
     }
 }

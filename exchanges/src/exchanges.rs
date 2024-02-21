@@ -1,15 +1,12 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use protos::ruuster::Message;
 use types::FanoutExchange;
+use common::{QueueContainer, QueueName};
 
 pub mod types;
-
-pub type QueueName = String;
-pub type Queue = VecDeque<Message>;
-pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
@@ -54,7 +51,7 @@ pub trait Exchange {
     fn handle_message(
         &self,
         message: &Option<Message>,
-        queues: Arc<RwLock<QueueContainer>>,
+        queues: &QueueContainer,
     ) -> Result<u32, ExchangeError>;
 }
 
@@ -71,14 +68,17 @@ impl From<i32> for ExchangeKind {
     fn from(value: i32) -> Self {
         match value {
             0 => ExchangeKind::Fanout,
-            _ => panic!("wrong value for ExchangeKind")
+            wrong_value => {
+                log::error!("value {} is not correct ExchangeKind, will use Fanout", wrong_value);
+                ExchangeKind::Fanout
+            }
         }
     }
 }
 
-impl Into<i32> for ExchangeKind {
-    fn into(self) -> i32 {
-        match self {
+impl From<ExchangeKind> for i32 {
+    fn from(value: ExchangeKind) -> Self {
+        match value {
             ExchangeKind::Fanout => 0,
         }
     }

@@ -19,6 +19,7 @@ uuid = { version = "1.6.1", features = ["v4"]}
 exchanges = { path = "../exchanges" }
 protos = { path = "../protos" }
 utils = { path = "../utils" }
+common = { path = "../common" }
 
 [dev-dependencies]
 lazy_static = "1.4.0"
