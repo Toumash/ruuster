@@ -58,13 +58,6 @@ async fn update_chat_input(
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key_event.code {
         KeyCode::Esc => app.quit(),
-        KeyCode::Char('c') => {
-            if key_event.modifiers == KeyModifiers::CONTROL {
-                app.quit()
-            } else {
-                app.input_message.push('c');
-            }
-        }
         KeyCode::Up => {
             app.scroll_up();
         }
