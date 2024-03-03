@@ -64,7 +64,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let _ = self.get_queue(&request.queue_name)?;
         let _ = self.get_exchange(&request.exchange_name)?;
 
-        self.bind_queue_to_exchange(&request.queue_name, &request.exchange_name)?;
+        self.bind_queue_to_exchange(&request.header, &request.queue_name, &request.exchange_name)?;
         Ok(Response::new(Empty {}))
     }
 
