@@ -41,8 +41,8 @@ impl Exchange for DirectExchange {
         Ok(())
     }
 
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName> {
-        &self.bound_queues
+    fn get_bound_queue_names(&self) -> HashSet<QueueName> {
+        self.bound_queues.clone()
     }
 
     fn handle_message(

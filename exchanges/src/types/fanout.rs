@@ -17,8 +17,8 @@ impl Exchange for FanoutExchange {
         Ok(())
     }
 
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName> {
-        &self.bound_queues
+    fn get_bound_queue_names(&self) -> HashSet<QueueName> {
+        self.bound_queues.clone()
     }
 
     fn handle_message(
@@ -36,7 +36,7 @@ impl Exchange for FanoutExchange {
 
         let mut pushed_counter: u32 = 0;
         for name in queues_names {
-            if let Some(queue) = queues_read.get(name) {
+            if let Some(queue) = queues_read.get(&name) {
                 queue.lock().unwrap().push_back(message.clone().unwrap());
                 pushed_counter+=1;
             }

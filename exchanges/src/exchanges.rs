@@ -16,6 +16,7 @@ type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
+pub type ExchangeMetadata = HashMap<String, String>;
 
 pub type QueueMetadata = HashMap<String, String>;
 
@@ -54,7 +55,7 @@ impl fmt::Display for ExchangeError {
 
 pub trait Exchange {
     fn bind(&mut self, queue_name: &QueueName, metadata: &QueueMetadata) -> Result<(), ExchangeError>;
-    fn get_bound_queue_names(&self) -> &HashSet<QueueName>;
+    fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
         &self,
         message: &Option<Message>,
