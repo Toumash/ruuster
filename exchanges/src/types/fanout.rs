@@ -23,7 +23,7 @@ impl FanoutExchange {
 }
 
 impl Exchange for FanoutExchange {
-    fn bind(&mut self, queue_name: &QueueName) -> Result<(), ExchangeError> {
+    fn bind(&mut self, queue_name: &QueueName, metadata: &QueueMetadata) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
             return Err(ExchangeError::BindFail {
                 reason: "name of queue must be unique".to_string(),
@@ -32,8 +32,8 @@ impl Exchange for FanoutExchange {
         Ok(())
     }
 
-    fn get_bound_queue_names(&self) -> Vec<QueueName> {
-        self.bound_queues.iter().cloned().collect()
+    fn get_bound_queue_names(&self) -> HashSet<QueueName> {
+        self.bound_queues.clone()
     }
 
     fn handle_message(
@@ -106,8 +106,13 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
+    use lazy_static::lazy_static;
+    lazy_static! {
+        static ref MAP: HashMap<String, String> = HashMap::new();
+    }
 
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
+
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
         queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::new())));
@@ -120,18 +125,18 @@ mod tests {
     #[test]
     fn bind_test() {
         let mut ex = FanoutExchange::default();
-        assert_eq!(ex.bind(&"q1".to_string()), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string()), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string()), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), &MAP), Ok(()));
         assert_eq!(ex.get_bound_queue_names().len(), 3);
     }
 
     #[test]
     fn duplicates_bind_test() {
         let mut ex = FanoutExchange::default();
-        assert_eq!(ex.bind(&"q1".to_string()), Ok(()));
-        assert!(ex.bind(&"q1".to_string()).is_err());
-        assert!(ex.bind(&"q1".to_string()).is_err());
+        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
+        assert!(ex.bind(&"q1".to_string(), &MAP).is_err());
+        assert!(ex.bind(&"q1".to_string(), &MAP).is_err());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
     }
 
@@ -140,12 +145,13 @@ mod tests {
         let queues = setup_test_queues();
         let mut ex = FanoutExchange::default();
 
-        assert_eq!(ex.bind(&"q1".to_string()), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string()), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string()), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), &MAP), Ok(()));
 
         let message = Some(Message {
             uuid: Uuid::new_v4().to_string(),
+            header: MAP.clone(),
             payload: "#abadcaffe".to_string(),
         });
 

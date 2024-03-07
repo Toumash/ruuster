@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 
 use tonic::transport::Channel;
@@ -8,6 +9,8 @@ use ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefini
 
 use protos::ruuster;
 use utils::console_input;
+
+use exchanges::ExchangeMetadata;
 
 fn handle_menu() -> i32 {
     println!("Ruuster gRPC queues demo");
@@ -88,6 +91,7 @@ async fn bind_queue(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn s
 
     client
         .bind_queue_to_exchange(BindQueueToExchangeRequest {
+            header: ExchangeMetadata::new(),
             queue_name,
             exchange_name,
         })
@@ -111,9 +115,11 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
     for _ in 0..amount {
         let message = ruuster::Message {
             uuid: Uuid::new_v4().to_string(),
+            header: HashMap::new(),
             payload: payload.clone(),
         };
         let request = ruuster::ProduceRequest {
+            header: ExchangeMetadata::new(),
             payload: Some(message),
             exchange_name: exchange_name.clone(),
         };

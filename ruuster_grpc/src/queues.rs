@@ -1,4 +1,4 @@
-use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
+use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType, QueueMetadata};
 use protos::Message;
 
 use tokio::sync::mpsc;
@@ -140,7 +140,7 @@ impl RuusterQueues {
     pub fn get_bindings_list(
         &self,
         exchange_name: &ExchangeName,
-    ) -> Result<Vec<QueueName>, Status> {
+    ) -> Result<HashSet<QueueName>, Status> {
         let exchange = self.get_exchange(exchange_name)?;
         let exchange_read = exchange.write().map_err(|e| {
             RuusterQueues::log_status(
@@ -157,6 +157,7 @@ impl RuusterQueues {
 
     pub fn bind_queue_to_exchange(
         &self,
+        header: &QueueMetadata,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
     ) -> Result<(), Status> {
@@ -170,7 +171,7 @@ impl RuusterQueues {
                 tonic::Code::Unavailable,
             )
         })?;
-        exchange_write.bind(queue_name).map_err(|e| {
+        exchange_write.bind(queue_name, header).map_err(|e| {
             RuusterQueues::log_status(
                 &format!(
                     "failed to bind queue {} to echange {}: {}",
