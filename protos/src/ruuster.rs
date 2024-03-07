@@ -6,7 +6,12 @@ pub struct Empty {}
 pub struct Message {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
-    #[prost(string, tag = "2")]
+    #[prost(map = "string, string", tag = "2")]
+    pub header: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(string, tag = "3")]
     pub payload: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -32,9 +37,14 @@ pub struct ExchangeDeclareRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BindQueueToExchangeRequest {
-    #[prost(string, tag = "1")]
-    pub exchange_name: ::prost::alloc::string::String,
+    #[prost(map = "string, string", tag = "1")]
+    pub header: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
     #[prost(string, tag = "2")]
+    pub exchange_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
     pub queue_name: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
@@ -72,9 +82,14 @@ pub struct ConsumeRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProduceRequest {
-    #[prost(string, tag = "1")]
+    #[prost(map = "string, string", tag = "1")]
+    pub header: ::std::collections::HashMap<
+        ::prost::alloc::string::String,
+        ::prost::alloc::string::String,
+    >,
+    #[prost(string, tag = "2")]
     pub exchange_name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "2")]
+    #[prost(message, optional, tag = "3")]
     pub payload: ::core::option::Option<Message>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]

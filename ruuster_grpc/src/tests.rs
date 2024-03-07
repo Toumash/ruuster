@@ -1,7 +1,5 @@
 use exchanges::ExchangeKind;
 
-use exchanges::ExchangeKind;
-
 use crate::tests_utils::*;
 
 use super::Empty;

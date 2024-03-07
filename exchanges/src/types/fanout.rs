@@ -85,6 +85,7 @@ impl Exchange for FanoutExchange {
                             .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
                             .push_back(Message {
                                 uuid: msg.uuid,
+                                header: HashMap::new(),
                                 payload: val,
                             });
                     } else {
@@ -174,7 +175,7 @@ mod tests {
         queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::new())));
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
-        let _ = ex.bind(&"q1".to_string());
+        let _ = ex.bind(&"q1".to_string(), &ExchangeMetadata::new());
 
         // add the messages up to the limit
         for _ in 1..=1000 {
@@ -182,6 +183,7 @@ mod tests {
                 .handle_message(
                     &(Some(Message {
                         uuid: Uuid::new_v4().to_string(),
+                        header: HashMap::new(),
                         payload: "#abadcaffe".to_string(),
                     })),
                     queues.clone(),
@@ -191,6 +193,7 @@ mod tests {
 
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
+            header: HashMap::new(),
             payload: "#abadcaffe".to_string(),
         };
 
@@ -219,7 +222,7 @@ mod tests {
         assert!(dead_letter_queue.is_none());
 
         let mut ex = FanoutExchange::new("fanout_test".into());
-        let _ = ex.bind(&"q1".to_string());
+        let _ = ex.bind(&"q1".to_string(), &ExchangeMetadata::new());
 
         // add the messages up to the limit
         for _ in 1..=1000 {
@@ -227,6 +230,7 @@ mod tests {
                 .handle_message(
                     &(Some(Message {
                         uuid: Uuid::new_v4().to_string(),
+                        header: HashMap::new(),
                         payload: "#abadcaffe".to_string(),
                     })),
                     queues.clone(),
@@ -236,6 +240,7 @@ mod tests {
 
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
+            header: HashMap::new(),
             payload: "#abadcaffe".to_string(),
         };
 

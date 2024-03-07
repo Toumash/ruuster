@@ -108,7 +108,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues{
         &self,
         _request: tonic::Request<AckRequest>,
     ) -> Result<Response<Empty>, Status> {
-        let request = request.into_inner();
+        let request = _request.into_inner();
         self.apply_message_ack(request.uuid)?;
         Ok(Response::new(Empty {}))
     }
