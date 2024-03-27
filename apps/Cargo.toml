@@ -20,7 +20,7 @@ tonic-reflection = "0.10.2"
 tokio = { version = "1.34.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1.14"
 uuid = { version = "1.6.1", features = ["v4"]}
-env_logger = "0.10.1"
+env_logger = "0.11.3"
 exchanges = { path = "../exchanges" }
 ruuster-grpc = { path = "../ruuster_grpc" }
 protos = { path = "../protos" }
