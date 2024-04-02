@@ -24,11 +24,9 @@ impl FanoutExchange {
 }
 
 impl Exchange for FanoutExchange {
-    fn bind(&mut self, queue_name: &QueueName, metadata: &QueueMetadata) -> Result<(), ExchangeError> {
+    fn bind(&mut self, queue_name: &QueueName, _metadata: &QueueMetadata) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
-            return Err(ExchangeError::BindFail {
-                reason: "name of queue must be unique".to_string(),
-            });
+            return Err(ExchangeError::BindFail);
         }
         Ok(())
     }
@@ -43,9 +41,7 @@ impl Exchange for FanoutExchange {
         queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError> {
         if message.is_none() {
-            return Err(ExchangeError::EmptyPayloadFail {
-                reason: "sent message has no content".to_string(),
-            });
+            return Err(ExchangeError::EmptyPayloadFail);
         }
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)

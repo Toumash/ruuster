@@ -24,13 +24,19 @@ pub struct RuusterQueues {
 
 const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
 
-impl RuusterQueues {
-    pub fn new() -> Self {
-        RuusterQueues {
+impl Default for RuusterQueues {
+    fn default() -> Self {
+        Self {
             queues: Arc::new(RwLock::new(QueueContainer::new())),
             exchanges: Arc::new(RwLock::new(ExchangeContainer::new())),
             acks: Arc::new(RwLock::new(AckContainer::new())),
         }
+    }
+}
+
+impl RuusterQueues {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn add_queue(&self, queue_name: &QueueName) -> Result<(), Status> {
@@ -334,7 +340,7 @@ impl RuusterQueues {
                 }
             }
         });
-        return ReceiverStream::new(rx);
+        ReceiverStream::new(rx)
     }
 
     fn log_status(message: &String, code: tonic::Code) -> Status {

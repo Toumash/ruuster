@@ -16,14 +16,14 @@ impl Exchange for DirectExchange {
         
         let route_key = match metadata.get("route_key") {
             Some(k) => k,
-            None => return Err(ExchangeError::BindFail { reason: "Empty routing key".to_string() })
+            None => return Err(ExchangeError::BindFail)
         };
 
         match self.routings_map.entry(route_key.to_string()) {
             Entry::Occupied(o) => {
                 let value = o.into_mut();
                 match value.get(queue_name) {
-                    Some(v) => return Err(ExchangeError::BindFail { reason: format!("Queue {} already have routing key {}", v, route_key) }),
+                    Some(_) => return Err(ExchangeError::BindFail),
                     None => {
                         value.insert(queue_name.to_string())
                     }
@@ -50,15 +50,10 @@ impl Exchange for DirectExchange {
         message: &Option<Message>,
         queues: Arc<RwLock<QueueContainer>>
     ) -> Result<u32, ExchangeError> {
-        if message.is_none() {
-            return Err(ExchangeError::EmptyPayloadFail {
-                reason: "sent message has no content".to_string(),
-            });
-        }
 
         let msg = match message {
             Some(m) => m,
-            None => return Err(ExchangeError::EmptyPayloadFail { reason: "empty message".to_string() })
+            None => return Err(ExchangeError::EmptyPayloadFail)
         };
 
         let route_key = match msg.header.get("route_key") {

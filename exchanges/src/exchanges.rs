@@ -28,8 +28,8 @@ pub enum ExchangeKind {
 
 #[derive(PartialEq, Debug)]
 pub enum ExchangeError {
-    BindFail { reason: String },
-    EmptyPayloadFail { reason: String },
+    BindFail,
+    EmptyPayloadFail,
     GetSystemTimeFail {},
     DeadLetterQueueLockFail {},
     NoRouteKey,
@@ -39,11 +39,11 @@ pub enum ExchangeError {
 impl fmt::Display for ExchangeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ExchangeError::BindFail { reason } => {
-                write!(f, "binding to exchange failed: {}", reason)
+            ExchangeError::BindFail => {
+                write!(f, "binding to exchange failed")
             }
-            ExchangeError::EmptyPayloadFail { reason } => {
-                write!(f, "handling message failed: {}", reason)
+            ExchangeError::EmptyPayloadFail => {
+                write!(f, "handling message failed")
             }
             ExchangeError::GetSystemTimeFail {} => {
                 write!(
@@ -52,6 +52,7 @@ impl fmt::Display for ExchangeError {
                 )
             }
             ExchangeError::DeadLetterQueueLockFail {} => write!(f, "handling message failed: queue().lock() failed for dead letter queue"),
+
             ExchangeError::NoMatchingQueue { route_key } => {
                 write!(f ,"No matching queue for route key {}", route_key)
             }
@@ -95,11 +96,11 @@ impl From<i32> for ExchangeKind {
     }
 }
 
-impl Into<i32> for ExchangeKind {
-    fn into(self) -> i32 {
-        match self {
+impl From<ExchangeKind> for i32 {
+    fn from(value: ExchangeKind) -> Self {
+        match value {
             ExchangeKind::Fanout => 0,
-            ExchangeKind::Direct => 1
+            ExchangeKind::Direct => 1,
         }
     }
 }
