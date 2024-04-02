@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let current_dir = std::env::current_dir()?;
     let ruuster_descriptor_path = current_dir
         .join("protos")
-        .join("src")
+        .join("defs")
         .join("ruuster_descriptor.bin");
 
     let ruuster_descriptor_content = fs::read(ruuster_descriptor_path)?;

@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .args([
             "--proto_path=./defs",
             "--include_imports",
-            "--descriptor_set_out=src/ruuster_descriptor.bin",
+            "--descriptor_set_out=defs/ruuster_descriptor.bin",
             "./defs/ruuster.proto"
         ]).status().expect("failed to execute protoc");
 
