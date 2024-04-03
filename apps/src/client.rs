@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::io;
+use std::time::Duration;
 
 use tonic::transport::Channel;
 use uuid::Uuid;
@@ -7,7 +8,7 @@ use uuid::Uuid;
 use ruuster::{ruuster_client::RuusterClient, Empty, ConsumeRequest, QueueDeclareRequest};
 use ruuster::{BindQueueToExchangeRequest, ExchangeDeclareRequest, ExchangeDefinition};
 
-use protos::ruuster;
+use protos::{ruuster, AckMessageBulkRequest};
 use utils::console_input;
 
 use exchanges::ExchangeMetadata;
@@ -129,12 +130,23 @@ async fn produce(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+async fn listen(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest { queue_name, auto_ack: true };
-    let mut response_stream = client.consume(request).await?.into_inner();
+    let request = ConsumeRequest { queue_name, auto_ack };
+    let mut response_stream = client.consume_bulk(request).await?.into_inner();
+    let mut uuids = vec![];
     while let Some(message) = response_stream.message().await? {
+        uuids.push(message.uuid.clone());
         println!("Received message: {:#?}", message);
+        std::thread::sleep(Duration::from_millis(300)); // just to make debugging easier
+        if uuids.len() == 25 {
+            let ack_request = AckMessageBulkRequest {
+                uuids: uuids.clone()
+            };
+            client.ack_message_bulk(ack_request).await?;
+            println!("Acked bunch of messages");
+            uuids.clear();
+        }
     }
 
     Ok(())
@@ -142,7 +154,7 @@ async fn listen(client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::
 
 async fn consume_one_message(client: &mut RuusterClient<Channel>, auto_ack: bool) -> Result<(), Box<dyn std::error::Error>> {
     let queue_name = console_input("Type existing queue name: ")?;
-    let request = ConsumeRequest{ queue_name, auto_ack: auto_ack };
+    let request = ConsumeRequest{ queue_name, auto_ack };
     let response = client.consume_one(request).await?;
     println!("Received message: {:#?}", response);
     Ok(())
@@ -161,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             4 => list_exchanges(&mut client).await,
             5 => bind_queue(&mut client).await,
             6 => produce(&mut client).await,
-            7 => listen(&mut client).await,
+            7 => listen(&mut client, false).await,
             8 => consume_one_message(&mut client, true).await,
             9 => consume_one_message(&mut client, false).await,
             0 => return Ok(()),

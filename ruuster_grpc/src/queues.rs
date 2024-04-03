@@ -5,11 +5,11 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::{Duration, Instant};
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
+use std::time::Duration;
 
-use crate::acks::{AckContainer, AckRecord, ApplyAck};
+use crate::acks::{AckContainer, ApplyAck};
 
 pub type Uuid = String;
 pub type QueueName = String;
@@ -24,16 +24,23 @@ pub struct RuusterQueues {
 
 const DEFAULT_ACK_DURATION: Duration = Duration::from_secs(60);
 
-impl RuusterQueues {
-    pub fn new() -> Self {
-        RuusterQueues {
+impl Default for RuusterQueues {
+    fn default() -> Self {
+        Self {
             queues: Arc::new(RwLock::new(QueueContainer::new())),
             exchanges: Arc::new(RwLock::new(ExchangeContainer::new())),
             acks: Arc::new(RwLock::new(AckContainer::new())),
         }
     }
+}
+
+impl RuusterQueues {
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn add_queue(&self, queue_name: &QueueName) -> Result<(), Status> {
+        log::debug!("adding queue: {}", &queue_name);
         let mut queues_write = self.queues.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acquire queue exclusive-lock: {}", e),
@@ -49,7 +56,8 @@ impl RuusterQueues {
         }
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
-
+        
+        log::debug!("queue: {} added", &queue_name);
         Ok(())
     }
 
@@ -75,6 +83,7 @@ impl RuusterQueues {
         exchange_name: &ExchangeName,
         exchange_kind: ExchangeKind,
     ) -> Result<(), Status> {
+        log::debug!("adding exchange: {}", &exchange_name);
         let mut exchanges_write = self.exchanges.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acuire exchange exclusive-lock: {}", e),
@@ -90,6 +99,8 @@ impl RuusterQueues {
         }
 
         exchanges_write.insert(exchange_name.to_owned(), exchange_kind.create());
+
+        log::debug!("exchange: {} added", &exchange_name);
 
         Ok(())
     }
@@ -137,30 +148,13 @@ impl RuusterQueues {
             .collect())
     }
 
-    pub fn get_bindings_list(
-        &self,
-        exchange_name: &ExchangeName,
-    ) -> Result<HashSet<QueueName>, Status> {
-        let exchange = self.get_exchange(exchange_name)?;
-        let exchange_read = exchange.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!(
-                    "failed to acquire exchange {} exclusive lock: {}",
-                    exchange_name, e
-                ),
-                tonic::Code::Unavailable,
-            )
-        })?;
-
-        Ok(exchange_read.get_bound_queue_names())
-    }
-
     pub fn bind_queue_to_exchange(
         &self,
         header: &QueueMetadata,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
     ) -> Result<(), Status> {
+        log::debug!("binding queue: {} to exchange: {}", queue_name, exchange_name);
         let exchange = self.get_exchange(exchange_name)?;
         let mut exchange_write = exchange.write().map_err(|e| {
             RuusterQueues::log_status(
@@ -179,7 +173,9 @@ impl RuusterQueues {
                 ),
                 tonic::Code::Internal,
             )
-        })
+        })?;
+        log::debug!("binding queue: {} to exchange: {} completed", queue_name, exchange_name);
+        Ok(())
     }
 
     pub fn forward_message(
@@ -187,6 +183,11 @@ impl RuusterQueues {
         message: &Option<Message>,
         exchange_name: &ExchangeName,
     ) -> Result<u32, Status> {
+        let uuid = match message.as_ref(){
+            Some(msg) => &msg.uuid,
+            None => "N/A",
+        };
+        log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
         let exchange = self.get_exchange(exchange_name)?;
 
         let result = {
@@ -206,44 +207,58 @@ impl RuusterQueues {
                     )
                 })
         };
-
+        log::debug!("message forwarding completed (uuid: {}, echange: {})", uuid, exchange_name);
         result
     }
 
-    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
-        let mut acks = self.acks.write().map_err(|e| {
+    fn get_acks(&self) -> Result<RwLockWriteGuard<'_, AckContainer>, Status> {
+        let acks = self.acks.write().map_err(|e| {
             RuusterQueues::log_status(
                 &format!("failed to acquire acks lock: {}", e),
                 tonic::Code::Unavailable,
             )
         })?;
+
+        Ok(acks)
+    }
+
+    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
+        log::debug!("single message ack for msg with uuid: {}", &uuid);
+        let mut acks = self.get_acks()?;
 
         acks.apply_ack(&uuid)?;
         acks.clear_unused_record(&uuid)?;
+        log::debug!("ack for message with uuid: {} completed", &uuid);
         Ok(())
     }
 
-    pub fn track_message_delivery(&self, message: Message, duration: Duration) -> Result<(), Status> {
-        let mut acks = self.acks.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire acks lock: {}", e),
-                tonic::Code::Unavailable,
-            )
-        })?;
-
-        let uuid = message.uuid.to_owned();
-
-        acks.entry(uuid)
-            .and_modify(|elem| {
-                elem.increment_counter();
-            })
-            .or_insert(AckRecord::new(message, Instant::now(), duration));
-
+    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid]) -> Result<(), Status> {
+        log::debug!("acking multiple messages");
+        let mut acks = self.get_acks()?;
+        acks.apply_bulk_ack(uuids)?;
+        acks.clear_all_unused_records()?;
+        log::debug!("acking multiple messages completed, acked uuids: {:#?}", uuids);
         Ok(())
     }
 
-    pub fn consume_message(&self, queue_name: &QueueName) -> Result<Message, Status> {
+    fn track_message_delivery(
+        acks: &mut AckContainer,
+        message: Message,
+        duration: Duration,
+    ) -> Result<(), Status> {
+        log::debug!("started tracking delivery for message: {}", &message.uuid);
+        acks.add_record(message, duration);
+        Ok(())
+    }
+
+    pub fn consume_message(
+        &self,
+        queue_name: &QueueName,
+        auto_ack: bool,
+    ) -> Result<Message, Status> {
+        log::debug!("started consuming single message from queue: {}", queue_name);
         let queue = self.get_queue(queue_name)?;
+        let mut acks = self.get_acks()?;
 
         let message = {
             queue
@@ -260,8 +275,15 @@ impl RuusterQueues {
         match message {
             Some(msg) => {
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
-                self.track_message_delivery(msg.clone(), DEFAULT_ACK_DURATION)?;
-                return Ok(msg);
+                if !auto_ack {
+                    RuusterQueues::track_message_delivery(
+                        &mut acks,
+                        msg.clone(),
+                        DEFAULT_ACK_DURATION,
+                    )?;
+                }
+                log::debug!("consuming single message from queue: {} completed", queue_name);
+                Ok(msg)
             }
             None => Err(Status::not_found("failed to return message")),
         }
@@ -270,10 +292,13 @@ impl RuusterQueues {
     pub async fn start_consuming_task(
         &self,
         queue_name: &QueueName,
+        auto_ack: bool,
     ) -> ReceiverStream<Result<Message, Status>> {
+        log::debug!("spawning consuming task for queue: {}", queue_name);
         let (tx, rx) = mpsc::channel(4);
         let queues = self.queues.clone();
         let queue_name = queue_name.clone();
+        let acks_arc = self.acks.clone();
 
         tokio::spawn(async move {
             loop {
@@ -294,20 +319,31 @@ impl RuusterQueues {
                 };
 
                 if let Some(message) = message {
+                    if !auto_ack {
+                        let mut acks = acks_arc.write().unwrap();
+                        // TODO(msaff): add proper error handling
+                        let _ = RuusterQueues::track_message_delivery(
+                            &mut acks,
+                            message.clone(),
+                            DEFAULT_ACK_DURATION,
+                        );
+                    }
+                   
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
                         return Status::internal(msg);
                     }
+                    log::debug!("message from queue: {} correclty sent over channel", queue_name);
                 } else {
                     tokio::task::yield_now().await;
                 }
             }
         });
-        return ReceiverStream::new(rx);
+        ReceiverStream::new(rx)
     }
 
     fn log_status(message: &String, code: tonic::Code) -> Status {
-        return Status::new(code, message);
+        Status::new(code, message)
     }
 }
