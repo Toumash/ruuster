@@ -4,7 +4,7 @@ package ruuster;
 service Ruuster {
     rpc QueueDeclare(QueueDeclareRequest) returns (Empty);
     rpc ExchangeDeclare(ExchangeDeclareRequest) returns (Empty);
-    rpc BindQueueToExchange(BindQueueToExchangeRequest) returns (Empty);
+    rpc Bind(BindRequest) returns (Empty);
     rpc ListQueues(Empty) returns (ListQueuesResponse);
     rpc ListExchanges(Empty) returns (ListExchangesResponse);
     rpc Produce(ProduceRequest) returns (Empty);
@@ -16,11 +16,17 @@ service Ruuster {
 
 message Empty {}
 
+message RoutingKey {
+    string value = 1;
+}
 
 message Message {
     string uuid = 1;
-    map<string, string> header = 2;
-    string payload = 3;
+    string payload = 2;
+}
+
+message Metadata {
+    RoutingKey routing_key = 1;
 }
 
 message ExchangeDefinition {
@@ -36,8 +42,8 @@ message ExchangeDeclareRequest {
     ExchangeDefinition exchange = 1;
 }
 
-message BindQueueToExchangeRequest {
-    map<string, string> header = 1;
+message BindRequest {
+    Metadata metadata = 1;
     string exchange_name = 2;
     string queue_name = 3;
 }
@@ -52,14 +58,6 @@ message ListExchangesResponse
     repeated string exchange_names = 1;
 }
 
-message ListBindingsRequest {
-    string exchange_name = 1;
-}
-
-message ListBindingsResponse {
-    repeated string queue_names = 1;
-}
-
 message ConsumeRequest
 {
     string queue_name = 1;
@@ -68,9 +66,9 @@ message ConsumeRequest
 
 message ProduceRequest
 {
-    map<string, string> header = 1;
+    Metadata metadata = 1;
     string exchange_name = 2;
-    Message payload = 3;
+    string payload = 3;
 }
 
 message AckRequest

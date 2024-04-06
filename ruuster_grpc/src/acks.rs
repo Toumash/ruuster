@@ -6,9 +6,9 @@ use std::{
 use protos::Message;
 use tonic::Status;
 
-use crate::queues::Uuid;
+type UuidSerialized = String;
 
-pub type AckContainer = HashMap<Uuid, AckRecord>;
+pub type AckContainer = HashMap<UuidSerialized, AckRecord>;
 
 pub struct AckRecord {
     message: Message,
@@ -113,7 +113,7 @@ impl AckRecord {
 /// use std::collections::HashMap;
 ///
 /// let mut acks = AckContainer::new();
-/// let msg = Message { header: HashMap::new(), uuid : "teepot".to_string(), payload: "#badcaffe".to_string()}; // fake message with hardcoded uuid
+/// let msg = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string()}; // fake message with hardcoded uuid
 ///
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 1); // first call creates an entry in map
@@ -121,7 +121,7 @@ impl AckRecord {
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 1); // second call with the same uuid updates an existing entry
 ///
-/// let msg = Message { header: HashMap::new(), uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
+/// let msg = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 2); // message with different uuid creates a separate entry
 ///
@@ -143,8 +143,8 @@ impl AckRecord {
 /// assert_eq!(acks.len(), 0);
 /// 
 /// 
-/// let msg1 = Message { header: HashMap::new(), uuid : "teepot".to_string(), payload: "#badcaffe".to_string()};
-/// let msg2 = Message { header: HashMap::new(), uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
+/// let msg1 = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string()};
+/// let msg2 = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
 /// acks.add_record(msg1.clone(), Duration::from_millis(100));
 /// acks.add_record(msg2.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 2);
@@ -155,15 +155,15 @@ impl AckRecord {
 /// ```
 
 pub trait ApplyAck {
-    fn apply_ack(&mut self, uuid: &Uuid) -> Result<(), Status>;
-    fn apply_bulk_ack(&mut self, uuids: &[Uuid]) -> Result<(), Status>;
-    fn clear_unused_record(&mut self, uuid: &Uuid) -> Result<(), Status>;
+    fn apply_ack(&mut self, uuid: &UuidSerialized) -> Result<(), Status>;
+    fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status>;
+    fn clear_unused_record(&mut self, uuid: &UuidSerialized) -> Result<(), Status>;
     fn clear_all_unused_records(&mut self) -> Result<(), Status>;
     fn add_record(&mut self, message: Message, duration: Duration);
 }
 
 impl ApplyAck for AckContainer {
-    fn clear_unused_record(&mut self, uuid: &Uuid) -> Result<(), Status> {
+    fn clear_unused_record(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get(uuid) {
             if record.get_counter() <= 0 {
                 log::debug!("deleting ack record for message with uuid: {}", uuid);
@@ -186,7 +186,7 @@ impl ApplyAck for AckContainer {
             .or_insert(AckRecord::new(message, Instant::now(), duration));
     }
 
-    fn apply_ack(&mut self, uuid: &Uuid) -> Result<(), Status> {
+    fn apply_ack(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get_mut(uuid) {
             record.apply_ack().map_err(|e| {
                 let msg = format!("appling ack for message failed: {:?}", e);
@@ -200,7 +200,7 @@ impl ApplyAck for AckContainer {
         Err(Status::not_found(&msg))
     }
 
-    fn apply_bulk_ack(&mut self, uuids: &[Uuid]) -> Result<(), Status> {
+    fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status> {
         for item in uuids {
             self.apply_ack(item)?;
         }

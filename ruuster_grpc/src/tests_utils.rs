@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
@@ -123,10 +122,10 @@ pub async fn create_bindings(
 ) {
     for (queue_name, exchange_name) in bindings {
         let response = client
-            .bind_queue_to_exchange(BindQueueToExchangeRequest {
-                header: HashMap::new(),
+            .bind(BindRequest {
                 exchange_name: exchange_name.to_string(),
                 queue_name: queue_name.to_string(),
+                metadata: None
             })
             .await;
 
@@ -157,13 +156,9 @@ pub async fn produce_n_random_messages(
         log::info!("generated payload: {}", &payload);
         result.push(payload.clone());
         let request = ProduceRequest {
-            header: HashMap::new(),
             exchange_name: exchange_name.clone(),
-            payload: Some(Message {
-                uuid: uuid::Uuid::new_v4().to_string(),
-                header: HashMap::new(),
-                payload,
-            }),
+            payload,
+            metadata: None
         };
 
         let response = client.produce(request.clone()).await;
@@ -174,7 +169,7 @@ pub async fn produce_n_random_messages(
             assert!(
                 response.is_ok(),
                 "pushing message {:#?} to exchange {} failed: {}",
-                request.payload.unwrap(),
+                request.payload,
                 &exchange_name,
                 response.unwrap_err()
             );

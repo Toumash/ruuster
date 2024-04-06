@@ -3,16 +3,23 @@
 pub struct Empty {}
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RoutingKey {
+    #[prost(string, tag = "1")]
+    pub value: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Message {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
-    #[prost(map = "string, string", tag = "2")]
-    pub header: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        ::prost::alloc::string::String,
-    >,
-    #[prost(string, tag = "3")]
+    #[prost(string, tag = "2")]
     pub payload: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Metadata {
+    #[prost(message, optional, tag = "1")]
+    pub routing_key: ::core::option::Option<RoutingKey>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -36,12 +43,9 @@ pub struct ExchangeDeclareRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct BindQueueToExchangeRequest {
-    #[prost(map = "string, string", tag = "1")]
-    pub header: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        ::prost::alloc::string::String,
-    >,
+pub struct BindRequest {
+    #[prost(message, optional, tag = "1")]
+    pub metadata: ::core::option::Option<Metadata>,
     #[prost(string, tag = "2")]
     pub exchange_name: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
@@ -61,18 +65,6 @@ pub struct ListExchangesResponse {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ListBindingsRequest {
-    #[prost(string, tag = "1")]
-    pub exchange_name: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ListBindingsResponse {
-    #[prost(string, repeated, tag = "1")]
-    pub queue_names: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConsumeRequest {
     #[prost(string, tag = "1")]
     pub queue_name: ::prost::alloc::string::String,
@@ -82,15 +74,12 @@ pub struct ConsumeRequest {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ProduceRequest {
-    #[prost(map = "string, string", tag = "1")]
-    pub header: ::std::collections::HashMap<
-        ::prost::alloc::string::String,
-        ::prost::alloc::string::String,
-    >,
+    #[prost(message, optional, tag = "1")]
+    pub metadata: ::core::option::Option<Metadata>,
     #[prost(string, tag = "2")]
     pub exchange_name: ::prost::alloc::string::String,
-    #[prost(message, optional, tag = "3")]
-    pub payload: ::core::option::Option<Message>,
+    #[prost(string, tag = "3")]
+    pub payload: ::prost::alloc::string::String,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -233,9 +222,9 @@ pub mod ruuster_client {
                 .insert(GrpcMethod::new("ruuster.Ruuster", "ExchangeDeclare"));
             self.inner.unary(req, path, codec).await
         }
-        pub async fn bind_queue_to_exchange(
+        pub async fn bind(
             &mut self,
-            request: impl tonic::IntoRequest<super::BindQueueToExchangeRequest>,
+            request: impl tonic::IntoRequest<super::BindRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
             self.inner
                 .ready()
@@ -247,12 +236,9 @@ pub mod ruuster_client {
                     )
                 })?;
             let codec = tonic::codec::ProstCodec::default();
-            let path = http::uri::PathAndQuery::from_static(
-                "/ruuster.Ruuster/BindQueueToExchange",
-            );
+            let path = http::uri::PathAndQuery::from_static("/ruuster.Ruuster/Bind");
             let mut req = request.into_request();
-            req.extensions_mut()
-                .insert(GrpcMethod::new("ruuster.Ruuster", "BindQueueToExchange"));
+            req.extensions_mut().insert(GrpcMethod::new("ruuster.Ruuster", "Bind"));
             self.inner.unary(req, path, codec).await
         }
         pub async fn list_queues(
@@ -432,9 +418,9 @@ pub mod ruuster_server {
             &self,
             request: tonic::Request<super::ExchangeDeclareRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
-        async fn bind_queue_to_exchange(
+        async fn bind(
             &self,
-            request: tonic::Request<super::BindQueueToExchangeRequest>,
+            request: tonic::Request<super::BindRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
         async fn list_queues(
             &self,
@@ -651,13 +637,11 @@ pub mod ruuster_server {
                     };
                     Box::pin(fut)
                 }
-                "/ruuster.Ruuster/BindQueueToExchange" => {
+                "/ruuster.Ruuster/Bind" => {
                     #[allow(non_camel_case_types)]
-                    struct BindQueueToExchangeSvc<T: Ruuster>(pub Arc<T>);
-                    impl<
-                        T: Ruuster,
-                    > tonic::server::UnaryService<super::BindQueueToExchangeRequest>
-                    for BindQueueToExchangeSvc<T> {
+                    struct BindSvc<T: Ruuster>(pub Arc<T>);
+                    impl<T: Ruuster> tonic::server::UnaryService<super::BindRequest>
+                    for BindSvc<T> {
                         type Response = super::Empty;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
@@ -665,12 +649,11 @@ pub mod ruuster_server {
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::BindQueueToExchangeRequest>,
+                            request: tonic::Request<super::BindRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
-                                <T as Ruuster>::bind_queue_to_exchange(&inner, request)
-                                    .await
+                                <T as Ruuster>::bind(&inner, request).await
                             };
                             Box::pin(fut)
                         }
@@ -682,7 +665,7 @@ pub mod ruuster_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let inner = inner.0;
-                        let method = BindQueueToExchangeSvc(inner);
+                        let method = BindSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

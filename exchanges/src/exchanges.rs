@@ -3,8 +3,10 @@ use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use protos::ruuster::Message;
 use serde_json::json;
+
+use protos::ruuster::Message;
+use protos::ruuster::Metadata;
 use types::{DirectExchange, FanoutExchange};
 
 pub mod types;
@@ -16,9 +18,6 @@ type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
-pub type ExchangeMetadata = HashMap<String, String>;
-
-pub type QueueMetadata = HashMap<String, String>;
 
 #[derive(PartialEq, Debug)]
 pub enum ExchangeKind {
@@ -67,16 +66,13 @@ impl fmt::Display for ExchangeError {
 }
 
 pub trait Exchange {
-    fn bind(
-        &mut self,
-        queue_name: &QueueName,
-        metadata: &QueueMetadata,
-    ) -> Result<(), ExchangeError>;
+    fn bind(&mut self, queue_name: &QueueName, metadata: Option<&Metadata>) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
         &self,
-        message: &Option<Message>,
+        message: Message,
         queues: Arc<RwLock<QueueContainer>>,
+        metadata: Option<&Metadata>,
     ) -> Result<u32, ExchangeError>;
 }
 
@@ -126,7 +122,7 @@ pub(crate) trait PushToQueueStrategy {
     fn push_to_queue(
         &self,
         exchange_name: &String,
-        message: &Option<Message>,
+        message: Message,
         queue: &Arc<Mutex<VecDeque<Message>>>,
         name: &String,
         queues_read: &std::sync::RwLockReadGuard<
@@ -134,7 +130,6 @@ pub(crate) trait PushToQueueStrategy {
             HashMap<String, Arc<Mutex<VecDeque<Message>>>>,
         >,
     ) -> Result<PushResult, ExchangeError> {
-        let msg = message.clone().unwrap();
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_millis() as i64)
@@ -145,13 +140,13 @@ pub(crate) trait PushToQueueStrategy {
             log::warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                 // FIXME: use the deadletter queue defined per exchange
-                log::debug!("moving the message {} to the dead letter queue", msg.uuid);
+                log::debug!("moving the message {} to the dead letter queue", message.uuid);
 
                 // FIXME: convert to ruuster headers
                 let val = json!({
                     "count": 1,
                     "exchange": exchange_name,
-                    "original_message": msg.payload,
+                    "original_message": message.payload,
                     "reason": "max_len",
                     "time": timestamp,
                     "queue": name.to_string(),
@@ -162,16 +157,15 @@ pub(crate) trait PushToQueueStrategy {
                     .lock()
                     .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
                     .push_back(Message {
-                        uuid: msg.uuid,
-                        header: HashMap::new(),
+                        uuid: message.uuid,
                         payload: val,
                     });
             } else {
-                log::debug!("message {} dropped", msg.uuid);
+                log::debug!("message {} dropped", message.uuid);
             }
             return Ok(PushResult::QueueOverflow);
         } else {
-            queue_lock.push_back(message.clone().unwrap());
+            queue_lock.push_back(message);
             return Ok(PushResult::Ok);
         }
     }
