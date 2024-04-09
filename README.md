@@ -15,6 +15,10 @@ cargo watch -x 'run --bin server'
 
 # to run the client
 cargo run --bin client
+
+
+# to run with a specified log level
+RUST_LOG=debug cargo run --bin client
 ```
 ---
 # Ruuster workspace
