@@ -1,8 +1,6 @@
 use log::info;
-use serde_json::json;
 use std::collections::hash_map::Entry;
 use std::collections::HashSet;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::*;
 
@@ -23,8 +21,8 @@ impl DirectExchange {
         }
     }
 }
-pub const QUEUE_MAX_LENGTH: usize = 1_000;
-pub const DEADLETTER_QUEUE_NAME: &str = "_deadletter";
+
+impl PushToQueueStrategy for DirectExchange {}
 
 impl Exchange for DirectExchange {
     fn bind(
@@ -88,45 +86,11 @@ impl Exchange for DirectExchange {
         let queues_read = queues.read().unwrap();
         let mut pushed_counter: u32 = 0;
 
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
-
         for name in bound_queues {
             if let Some(queue) = queues_read.get(name) {
-                let msg = message.clone().unwrap();
-                let queue_lock = &mut queue.lock().unwrap();
-                if queue_lock.len() >= QUEUE_MAX_LENGTH {
-                    log::warn!("queue size reached for queue {}", name);
-                    if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
-                        // FIXME: use the deadletter queue defined per exchange
-                        log::debug!("moving the message {} to the dead letter queue", msg.uuid);
-
-                        // FIXME: convert to ruuster headers
-                        let val = json!({
-                            "count": 1,
-                            "exchange": self.exchange_name,
-                            "original_message": msg.payload,
-                            "reason": "max_len",
-                            "time": timestamp,
-                            "queue": name.to_string(),
-                        })
-                        .to_string();
-
-                        dead_letter_queue
-                            .lock()
-                            .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
-                            .push_back(Message {
-                                uuid: msg.uuid,
-                                header: HashMap::new(),
-                                payload: val,
-                            });
-                    } else {
-                        log::debug!("message {} dropped", msg.uuid);
-                    }
-                } else {
-                    queue_lock.push_back(message.clone().unwrap());
+                if self.push_to_queue(&self.exchange_name, message, queue, name, &queues_read)?
+                    == PushResult::Ok
+                {
                     pushed_counter += 1;
                 }
             }

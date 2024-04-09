@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
-
-
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use protos::ruuster::Message;
-use types::{FanoutExchange, DirectExchange};
+use serde_json::json;
+use types::{DirectExchange, FanoutExchange};
 
 pub mod types;
 
@@ -23,7 +23,7 @@ pub type QueueMetadata = HashMap<String, String>;
 #[derive(PartialEq, Debug)]
 pub enum ExchangeKind {
     Fanout,
-    Direct
+    Direct,
 }
 
 #[derive(PartialEq, Debug)]
@@ -33,7 +33,7 @@ pub enum ExchangeError {
     GetSystemTimeFail {},
     DeadLetterQueueLockFail {},
     NoRouteKey,
-    NoMatchingQueue { route_key: String }
+    NoMatchingQueue { route_key: String },
 }
 
 impl fmt::Display for ExchangeError {
@@ -51,10 +51,13 @@ impl fmt::Display for ExchangeError {
                     "handling message failed: SystemTime::now().duration_since"
                 )
             }
-            ExchangeError::DeadLetterQueueLockFail {} => write!(f, "handling message failed: queue().lock() failed for dead letter queue"),
+            ExchangeError::DeadLetterQueueLockFail {} => write!(
+                f,
+                "handling message failed: queue().lock() failed for dead letter queue"
+            ),
 
             ExchangeError::NoMatchingQueue { route_key } => {
-                write!(f ,"No matching queue for route key {}", route_key)
+                write!(f, "No matching queue for route key {}", route_key)
             }
             ExchangeError::NoRouteKey => {
                 write!(f, "No routing key found")
@@ -64,7 +67,11 @@ impl fmt::Display for ExchangeError {
 }
 
 pub trait Exchange {
-    fn bind(&mut self, queue_name: &QueueName, metadata: &QueueMetadata) -> Result<(), ExchangeError>;
+    fn bind(
+        &mut self,
+        queue_name: &QueueName,
+        metadata: &QueueMetadata,
+    ) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
         &self,
@@ -78,7 +85,7 @@ impl ExchangeKind {
     pub fn create(&self) -> Arc<RwLock<ExchangeType>> {
         match self {
             ExchangeKind::Fanout => Arc::new(RwLock::new(FanoutExchange::default())),
-            ExchangeKind::Direct => Arc::new(RwLock::new(DirectExchange::default()))
+            ExchangeKind::Direct => Arc::new(RwLock::new(DirectExchange::default())),
         }
     }
 }
@@ -89,7 +96,10 @@ impl From<i32> for ExchangeKind {
             0 => ExchangeKind::Fanout,
             1 => ExchangeKind::Direct,
             wrong_value => {
-                log::error!("value {} is not correct ExchangeKind, will use Fanout", wrong_value);
+                log::error!(
+                    "value {} is not correct ExchangeKind, will use Fanout",
+                    wrong_value
+                );
                 ExchangeKind::Fanout
             }
         }
@@ -101,6 +111,68 @@ impl From<ExchangeKind> for i32 {
         match value {
             ExchangeKind::Fanout => 0,
             ExchangeKind::Direct => 1,
+        }
+    }
+}
+
+#[derive(PartialEq, Debug)]
+pub(crate) enum PushResult {
+    Ok,
+    QueueOverflow,
+}
+pub const QUEUE_MAX_LENGTH: usize = 1_000;
+pub const DEADLETTER_QUEUE_NAME: &str = "_deadletter";
+pub(crate) trait PushToQueueStrategy {
+    fn push_to_queue(
+        &self,
+        exchange_name: &String,
+        message: &Option<Message>,
+        queue: &Arc<Mutex<VecDeque<Message>>>,
+        name: &String,
+        queues_read: &std::sync::RwLockReadGuard<
+            '_,
+            HashMap<String, Arc<Mutex<VecDeque<Message>>>>,
+        >,
+    ) -> Result<PushResult, ExchangeError> {
+        let msg = message.clone().unwrap();
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
+
+        let queue_lock = &mut queue.lock().unwrap();
+        if queue_lock.len() >= QUEUE_MAX_LENGTH {
+            log::warn!("queue size reached for queue {}", name);
+            if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
+                // FIXME: use the deadletter queue defined per exchange
+                log::debug!("moving the message {} to the dead letter queue", msg.uuid);
+
+                // FIXME: convert to ruuster headers
+                let val = json!({
+                    "count": 1,
+                    "exchange": exchange_name,
+                    "original_message": msg.payload,
+                    "reason": "max_len",
+                    "time": timestamp,
+                    "queue": name.to_string(),
+                })
+                .to_string();
+
+                dead_letter_queue
+                    .lock()
+                    .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
+                    .push_back(Message {
+                        uuid: msg.uuid,
+                        header: HashMap::new(),
+                        payload: val,
+                    });
+            } else {
+                log::debug!("message {} dropped", msg.uuid);
+            }
+            return Ok(PushResult::QueueOverflow);
+        } else {
+            queue_lock.push_back(message.clone().unwrap());
+            return Ok(PushResult::Ok);
         }
     }
 }

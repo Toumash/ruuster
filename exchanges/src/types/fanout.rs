@@ -1,11 +1,6 @@
 use std::collections::HashSet;
-use serde_json::json;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::*;
-
-pub const QUEUE_MAX_LENGTH: usize = 1_000;
-pub const DEADLETTER_QUEUE_NAME: &str = "_deadletter";
 
 #[derive(Default)]
 pub struct FanoutExchange {
@@ -22,9 +17,14 @@ impl FanoutExchange {
         }
     }
 }
+impl PushToQueueStrategy for FanoutExchange {}
 
 impl Exchange for FanoutExchange {
-    fn bind(&mut self, queue_name: &QueueName, _metadata: &QueueMetadata) -> Result<(), ExchangeError> {
+    fn bind(
+        &mut self,
+        queue_name: &QueueName,
+        _metadata: &QueueMetadata,
+    ) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
             return Err(ExchangeError::BindFail);
         }
@@ -43,53 +43,16 @@ impl Exchange for FanoutExchange {
         if message.is_none() {
             return Err(ExchangeError::EmptyPayloadFail);
         }
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
-
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
         let mut pushed_counter: u32 = 0;
 
         for name in queues_names {
-            let msg = message.clone().unwrap();
-
             if let Some(queue) = queues_read.get(&name) {
-                let queue_lock = &mut queue.lock().unwrap();
-
-                if queue_lock.len() >= QUEUE_MAX_LENGTH {
-                    log::warn!("queue size reached for queue {}", name);
-
-                    if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
-                        // FIXME: use the deadletter queue defined per exchange
-                        log::debug!("moving the message {} to the dead letter queue", msg.uuid);
-
-                        // FIXME: convert to ruuster headers
-                        let val = json!({
-                            "count": 1,
-                            "exchange": self.exchange_name,
-                            "original_message": msg.payload,
-                            "reason": "max_len",
-                            "time": timestamp,
-                            "queue": name.to_string(),
-                        })
-                        .to_string();
-
-                        dead_letter_queue
-                            .lock()
-                            .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
-                            .push_back(Message {
-                                uuid: msg.uuid,
-                                header: HashMap::new(),
-                                payload: val,
-                            });
-                    } else {
-                        log::debug!("message {} dropped", msg.uuid);
-                    }
-                } else {
-                    queue_lock.push_back(message.clone().unwrap());
+                if self.push_to_queue(&self.exchange_name, message, queue, &name, &queues_read)?
+                    == PushResult::Ok
+                {
                     pushed_counter += 1;
                 }
             }
@@ -110,7 +73,6 @@ mod tests {
     }
 
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
-
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
         queues_write.insert("q1".to_string(), Arc::new(Mutex::new(Queue::new())));
@@ -169,7 +131,10 @@ mod tests {
         // arrange
         let queues = setup_test_queues();
         let mut queues_write = queues.write().unwrap();
-        queues_write.insert("_deadletter".to_string(), Arc::new(Mutex::new(Queue::new())));
+        queues_write.insert(
+            "_deadletter".to_string(),
+            Arc::new(Mutex::new(Queue::new())),
+        );
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
         let _ = ex.bind(&"q1".to_string(), &ExchangeMetadata::new());
