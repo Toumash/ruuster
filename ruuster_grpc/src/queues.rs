@@ -168,7 +168,7 @@ impl RuusterQueues {
         exchange_write.bind(queue_name, header).map_err(|e| {
             RuusterQueues::log_status(
                 &format!(
-                    "failed to bind queue {} to echange {}: {}",
+                    "failed to bind queue {} to exchange {}: {}",
                     queue_name, exchange_name, e
                 ),
                 tonic::Code::Internal,
@@ -207,7 +207,7 @@ impl RuusterQueues {
                     )
                 })
         };
-        log::debug!("message forwarding completed (uuid: {}, echange: {})", uuid, exchange_name);
+        log::debug!("message forwarding completed (uuid: {}, exchange: {})", uuid, exchange_name);
         result
     }
 
