@@ -1,16 +1,17 @@
 
-
+¼
 ruuster.protoruuster"
 Empty""
 
 RoutingKey
-value (	Rvalue"7
-Message
-uuid (	Ruuid
-payload (	Rpayload"@
+value (	Rvalue"@
 Metadata4
 routing_key (2.ruuster.RoutingKeyR
-routingKey"M
+routingKey"f
+Message
+uuid (	Ruuid
+payload (	Rpayload-
+metadata (2.ruuster.MetadataRmetadata"M
 ExchangeDefinition
 kind (Rkind#
 exchange_name (	RexchangeName"4

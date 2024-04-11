@@ -9,17 +9,19 @@ pub struct RoutingKey {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct Metadata {
+    #[prost(message, optional, tag = "1")]
+    pub routing_key: ::core::option::Option<RoutingKey>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Message {
     #[prost(string, tag = "1")]
     pub uuid: ::prost::alloc::string::String,
     #[prost(string, tag = "2")]
     pub payload: ::prost::alloc::string::String,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Metadata {
-    #[prost(message, optional, tag = "1")]
-    pub routing_key: ::core::option::Option<RoutingKey>,
+    #[prost(message, optional, tag = "3")]
+    pub metadata: ::core::option::Option<Metadata>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

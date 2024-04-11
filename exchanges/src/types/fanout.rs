@@ -35,8 +35,7 @@ impl Exchange for FanoutExchange {
     fn handle_message(
         &self,
         message: Message,
-        queues: Arc<RwLock<QueueContainer>>,
-        _metadata: Option<&Metadata>
+        queues: Arc<RwLock<QueueContainer>>
     ) -> Result<u32, ExchangeError> {
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
@@ -110,11 +109,12 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
+            metadata: None
         };
 
-        assert_eq!(ex.handle_message(message.clone(), queues.clone(), None), Ok(3u32));
-        assert_eq!(ex.handle_message(message.clone(), queues.clone(), None), Ok(3u32));
-        assert_eq!(ex.handle_message(message, queues.clone(), None), Ok(3u32));
+        assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message, queues.clone()), Ok(3u32));
 
         let queues_read = queues.read().unwrap();
         for (_, queue_mutex) in queues_read.iter() {
@@ -143,9 +143,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
+                        metadata: None
                     },
-                    queues.clone(),
-                    None
+                    queues.clone()
                 )
                 .unwrap();
         }
@@ -153,11 +153,12 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
+            metadata: None
         };
 
         // act
         let _ = ex
-            .handle_message(one_too_many_message.clone(), queues.clone(), None)
+            .handle_message(one_too_many_message.clone(), queues.clone())
             .unwrap();
 
         // assert
@@ -189,9 +190,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
+                        metadata: None
                     },
-                    queues.clone(),
-                    None
+                    queues.clone()
                 )
                 .unwrap();
         }
@@ -199,11 +200,12 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
+            metadata: None
         };
 
         // act
         let message_handled_by_queues_count = ex
-            .handle_message(one_too_many_message, queues.clone(), None)
+            .handle_message(one_too_many_message, queues.clone())
             .unwrap();
 
         // assert

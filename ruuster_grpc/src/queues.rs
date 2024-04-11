@@ -184,7 +184,7 @@ impl RuusterQueues {
         &self,
         payload: Payload,
         exchange_name: &ExchangeName,
-        metadata: Option<&Metadata>
+        metadata: Option<Metadata>
     ) -> Result<u32, Status> {
         let uuid = Uuid::new_v4().to_string();
         log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
@@ -198,10 +198,10 @@ impl RuusterQueues {
                 )
             })?;
 
-            let message = Message { uuid: uuid.clone(), payload };
+            let message = Message { uuid: uuid.clone(), payload, metadata };
 
             exchange_read
-                .handle_message(message, self.queues.clone(), metadata)
+                .handle_message(message, self.queues.clone())
                 .map_err(|e| {
                     RuusterQueues::log_status(
                         &format!("failed to handle message: {}", e),

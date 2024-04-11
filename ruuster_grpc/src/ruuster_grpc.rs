@@ -65,7 +65,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         let _ = self.get_queue(&request.queue_name)?;
         let _ = self.get_exchange(&request.exchange_name)?;
 
-        // convert Option<Metadata> to Option<&Metadata>
         let metadata = request.metadata.as_ref();
 
         self.bind_queue_to_exchange(&request.queue_name, &request.exchange_name, metadata)?;
@@ -103,7 +102,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        self.forward_message(request.payload, &request.exchange_name, request.metadata.as_ref())?;
+        self.forward_message(request.payload, &request.exchange_name, request.metadata)?;
         Ok(Response::new(Empty {}))
     }
 

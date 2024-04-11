@@ -113,7 +113,7 @@ impl AckRecord {
 /// use std::collections::HashMap;
 ///
 /// let mut acks = AckContainer::new();
-/// let msg = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string()}; // fake message with hardcoded uuid
+/// let msg = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string(), metadata: None}; // fake message with hardcoded uuid
 ///
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 1); // first call creates an entry in map
@@ -121,7 +121,7 @@ impl AckRecord {
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 1); // second call with the same uuid updates an existing entry
 ///
-/// let msg = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
+/// let msg = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string(), metadata: None};
 /// acks.add_record(msg.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 2); // message with different uuid creates a separate entry
 ///
@@ -143,8 +143,8 @@ impl AckRecord {
 /// assert_eq!(acks.len(), 0);
 /// 
 /// 
-/// let msg1 = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string()};
-/// let msg2 = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string()};
+/// let msg1 = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string(), metadata: None};
+/// let msg2 = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string(), metadata: None};
 /// acks.add_record(msg1.clone(), Duration::from_millis(100));
 /// acks.add_record(msg2.clone(), Duration::from_millis(100));
 /// assert_eq!(acks.len(), 2);

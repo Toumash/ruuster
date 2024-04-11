@@ -26,7 +26,6 @@ async fn setup_server() -> SocketAddr {
         env_logger::init();
     });
 
-    println!("seting up a server");
     let listener = TcpListener::bind(TEST_SERVER_ADDR).await.unwrap();
     let addr = listener.local_addr().unwrap();
     let ruuster_queue_service = RuusterQueues::new();

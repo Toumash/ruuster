@@ -7,7 +7,7 @@ use crate::*;
 #[derive(Default)]
 pub struct DirectExchange {
     bound_queues: HashSet<QueueName>,
-    routings_map: HashMap<String, HashSet<QueueName>>,
+    routing_map: HashMap<String, HashSet<QueueName>>,
     exchange_name: String,
 }
 
@@ -17,7 +17,7 @@ impl DirectExchange {
         DirectExchange {
             bound_queues: HashSet::new(),
             exchange_name,
-            routings_map: HashMap::new(),
+            routing_map: HashMap::new(),
         }
     }
 }
@@ -40,7 +40,7 @@ impl Exchange for DirectExchange {
             None => return Err(ExchangeError::BindFail),
         };
 
-        match self.routings_map.entry(route_key) {
+        match self.routing_map.entry(route_key) {
             Entry::Occupied(o) => {
                 let value = o.into_mut();
                 match value.get(queue_name) {
@@ -68,9 +68,8 @@ impl Exchange for DirectExchange {
         &self,
         message: Message,
         queues: Arc<RwLock<QueueContainer>>,
-        metadata: Option<&Metadata>,
     ) -> Result<u32, ExchangeError> {
-        let metadata = match metadata {
+        let metadata = match &message.metadata {
             Some(data) => data,
             None => return Err(ExchangeError::BindFail),
         };
@@ -80,7 +79,7 @@ impl Exchange for DirectExchange {
             None => return Err(ExchangeError::BindFail),
         };
 
-        let bound_queues = match self.routings_map.get(&route_key) {
+        let bound_queues = match self.routing_map.get(&route_key) {
             Some(q) => q,
             None => {
                 return Err(ExchangeError::NoMatchingQueue {
@@ -205,8 +204,6 @@ mod tests {
         });
         let queues = setup_test_queues();
         let mut ex = DirectExchange::default();
-        // let map_first = HashMap::from([("route_key".to_string(), "test_1".to_string())]);
-        // let map_second = HashMap::from([("route_key".to_string(), "test_2".to_string())]);
         
         let metadata_first = Metadata {
             routing_key: Some(RoutingKey {
@@ -227,16 +224,115 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
+            metadata: Some(metadata_first)
         };
 
-        assert_eq!(ex.handle_message(message.clone(), queues.clone(), Some(&metadata_first)), Ok(3u32));
-        assert_eq!(ex.handle_message(message, queues.clone(), Some(&metadata_first)), Ok(3u32));
+        assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message, queues.clone()), Ok(3u32));
 
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
+            metadata: Some(metadata_second)
         };
 
-        assert_eq!(ex.handle_message(message, queues.clone(), Some(&metadata_second)), Ok(1u32));
+        assert_eq!(ex.handle_message(message, queues.clone()), Ok(1u32));
+    }
+
+    #[test]
+    fn direct_exchange_will_send_message_to_dead_letter_queue_when_full() {
+        let queues = setup_test_queues();
+        let mut queues_write = queues.write().unwrap();
+        queues_write.insert(
+            "_deadletter".to_string(),
+            Arc::new(Mutex::new(Queue::new())),
+        );
+        drop(queues_write);
+        let mut ex = DirectExchange::new("fanout_test".into());
+        let routing_metadata = Metadata {
+            routing_key: Some(RoutingKey {
+                value: "route_key".to_string(),
+            }),
+        };
+        let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
+
+        for _ in 1..=1000 {
+            let _ = ex
+                .handle_message(
+                    Message {
+                        uuid: Uuid::new_v4().to_string(),
+                        payload: "#abadcaffe".to_string(),
+                        metadata: Some(routing_metadata.clone())
+                    },
+                    queues.clone()
+                )
+                .unwrap();
+        }
+
+        let one_too_many_message = Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+            metadata: Some(routing_metadata)
+        };
+
+        // act
+        let _ = ex
+            .handle_message(one_too_many_message.clone(), queues.clone())
+            .unwrap();
+
+        // assert
+        let queues_read = queues.read().unwrap();
+        let dead_letter_queue = &queues_read["_deadletter"];
+        assert_eq!(dead_letter_queue.lock().unwrap().len(), 1, "messages should be places into the dead letter queue after the capacity of a queue has been exhausted");
+        assert_eq!(
+            dead_letter_queue.lock().unwrap().pop_front().unwrap().uuid,
+            one_too_many_message.uuid
+        );
+    }
+
+    #[test]
+    fn direct_exchange_will_drop_message_when_deadletter_queue_does_not_exist() {
+        // arrange
+        let queues = setup_test_queues();
+        // we don't queues.insert here so there's no dead letter queue
+        let queues_read = queues.read().unwrap();
+        let dead_letter_queue = queues_read.get(DEADLETTER_QUEUE_NAME);
+        assert!(dead_letter_queue.is_none());
+
+        let mut ex = DirectExchange::new("fanout_test".into());
+        let routing_metadata = Metadata {
+            routing_key: Some(RoutingKey {
+                value: "route_key".to_string(),
+            }),
+        };
+        let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
+
+        // add the messages up to the limit
+        for _ in 1..=1000 {
+            let _ = ex
+                .handle_message(
+                    Message {
+                        uuid: Uuid::new_v4().to_string(),
+                        payload: "#abadcaffe".to_string(),
+                        metadata: Some(routing_metadata.clone())
+                    },
+                    queues.clone()
+                )
+                .unwrap();
+        }
+
+        let one_too_many_message = Message {
+            uuid: Uuid::new_v4().to_string(),
+            payload: "#abadcaffe".to_string(),
+            metadata: Some(routing_metadata)
+        };
+
+        // act
+        let message_handled_by_queues_count = ex
+            .handle_message(one_too_many_message, queues.clone())
+            .unwrap();
+
+        // assert
+        assert_eq!(message_handled_by_queues_count, 0);
     }
 }

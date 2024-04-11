@@ -72,7 +72,6 @@ pub trait Exchange {
         &self,
         message: Message,
         queues: Arc<RwLock<QueueContainer>>,
-        metadata: Option<&Metadata>,
     ) -> Result<u32, ExchangeError>;
 }
 
@@ -159,6 +158,7 @@ pub(crate) trait PushToQueueStrategy {
                     .push_back(Message {
                         uuid: message.uuid,
                         payload: val,
+                        metadata: None
                     });
             } else {
                 log::debug!("message {} dropped", message.uuid);
