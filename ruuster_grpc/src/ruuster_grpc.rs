@@ -1,9 +1,9 @@
 pub mod acks;
 pub mod queues;
 
-use protos::AckMessageBulkRequest;
+use protos::{AckMessageBulkRequest, BindRequest};
 use protos::{
-    ruuster, AckRequest, BindQueueToExchangeRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
+    ruuster, AckRequest, ConsumeRequest, Empty, ExchangeDeclareRequest,
     ListExchangesResponse, ListQueuesResponse, Message, ProduceRequest, QueueDeclareRequest,
 };
 use queues::RuusterQueues;
@@ -55,23 +55,26 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         Ok(Response::new(ListExchangesResponse { exchange_names }))
     }
 
-    async fn bind_queue_to_exchange(
+    async fn bind(
         &self,
-        request: tonic::Request<BindQueueToExchangeRequest>,
+        request: tonic::Request<BindRequest>,
     ) -> Result<tonic::Response<Empty>, tonic::Status> {
-        let request = request.into_inner();
+        let request: BindRequest = request.into_inner();
 
+        // check if requested queue and exchange exists
         let _ = self.get_queue(&request.queue_name)?;
         let _ = self.get_exchange(&request.exchange_name)?;
 
-        self.bind_queue_to_exchange(&request.header, &request.queue_name, &request.exchange_name)?;
+        let metadata = request.metadata.as_ref();
+
+        self.bind_queue_to_exchange(&request.queue_name, &request.exchange_name, metadata)?;
         Ok(Response::new(Empty {}))
     }
 
     type ConsumeBulkStream = ReceiverStream<Result<Message, Status>>;
 
     /**
-     * this request will receive messages from specific queue and return it in form of asynchronous stream
+     * receive messages from specific queue and return it in form of asynchronous stream
      */
     async fn consume_bulk(
         &self,
@@ -94,15 +97,12 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueues {
         Ok(Response::new(message))
     }
 
-    /**
-     * for now let's have a simple producer that will push message into exchange requested in message header
-     */
     async fn produce(
         &self,
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        self.forward_message(&request.payload, &request.exchange_name)?;
+        self.forward_message(request.payload, &request.exchange_name, request.metadata)?;
         Ok(Response::new(Empty {}))
     }
 

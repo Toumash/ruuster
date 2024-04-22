@@ -1,9 +1,10 @@
-use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType, QueueMetadata};
-use protos::Message;
+use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
+use protos::{Message, Metadata};
 
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
+use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
@@ -11,10 +12,11 @@ use std::time::Duration;
 
 use crate::acks::{AckContainer, ApplyAck};
 
-pub type Uuid = String;
+pub type Payload = String;
 pub type QueueName = String;
 pub type Queue = VecDeque<Message>;
 pub type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
+pub type UuidSerialized = String;
 
 pub struct RuusterQueues {
     queues: Arc<RwLock<QueueContainer>>,
@@ -150,9 +152,9 @@ impl RuusterQueues {
 
     pub fn bind_queue_to_exchange(
         &self,
-        header: &QueueMetadata,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
+        metadata: Option<&Metadata>
     ) -> Result<(), Status> {
         log::debug!("binding queue: {} to exchange: {}", queue_name, exchange_name);
         let exchange = self.get_exchange(exchange_name)?;
@@ -165,7 +167,7 @@ impl RuusterQueues {
                 tonic::Code::Unavailable,
             )
         })?;
-        exchange_write.bind(queue_name, header).map_err(|e| {
+        exchange_write.bind(queue_name, metadata).map_err(|e| {
             RuusterQueues::log_status(
                 &format!(
                     "failed to bind queue {} to exchange {}: {}",
@@ -180,13 +182,11 @@ impl RuusterQueues {
 
     pub fn forward_message(
         &self,
-        message: &Option<Message>,
+        payload: Payload,
         exchange_name: &ExchangeName,
+        metadata: Option<Metadata>
     ) -> Result<u32, Status> {
-        let uuid = match message.as_ref(){
-            Some(msg) => &msg.uuid,
-            None => "N/A",
-        };
+        let uuid = Uuid::new_v4().to_string();
         log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
         let exchange = self.get_exchange(exchange_name)?;
 
@@ -197,6 +197,8 @@ impl RuusterQueues {
                     tonic::Code::Unavailable,
                 )
             })?;
+
+            let message = Message { uuid: uuid.clone(), payload, metadata };
 
             exchange_read
                 .handle_message(message, self.queues.clone())
@@ -222,7 +224,7 @@ impl RuusterQueues {
         Ok(acks)
     }
 
-    pub fn apply_message_ack(&self, uuid: Uuid) -> Result<(), Status> {
+    pub fn apply_message_ack(&self, uuid: UuidSerialized) -> Result<(), Status> {
         log::debug!("single message ack for msg with uuid: {}", &uuid);
         let mut acks = self.get_acks()?;
 
@@ -232,7 +234,7 @@ impl RuusterQueues {
         Ok(())
     }
 
-    pub fn apply_message_bulk_ack(&self, uuids: &[Uuid]) -> Result<(), Status> {
+    pub fn apply_message_bulk_ack(&self, uuids: &[UuidSerialized]) -> Result<(), Status> {
         log::debug!("acking multiple messages");
         let mut acks = self.get_acks()?;
         acks.apply_bulk_ack(uuids)?;

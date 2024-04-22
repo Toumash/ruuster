@@ -1,14 +1,17 @@
 
-ì
+¼
 ruuster.protoruuster"
-Empty"¨
+Empty""
+
+RoutingKey
+value (	Rvalue"@
+Metadata4
+routing_key (2.ruuster.RoutingKeyR
+routingKey"f
 Message
-uuid (	Ruuid4
-header (2.ruuster.Message.HeaderEntryRheader
-payload (	Rpayload9
-HeaderEntry
-key (	Rkey
-value (	Rvalue:8"M
+uuid (	Ruuid
+payload (	Rpayload-
+metadata (2.ruuster.MetadataRmetadata"M
 ExchangeDefinition
 kind (Rkind#
 exchange_name (	RexchangeName"4
@@ -16,45 +19,34 @@
 
 queue_name (	R	queueName"Q
 ExchangeDeclareRequest7
-exchange (2.ruuster.ExchangeDefinitionRexchange"ä
-BindQueueToExchangeRequestG
-header (2/.ruuster.BindQueueToExchangeRequest.HeaderEntryRheader#
+exchange (2.ruuster.ExchangeDefinitionRexchange"€
+BindRequest-
+metadata (2.ruuster.MetadataRmetadata#
 exchange_name (	RexchangeName
 
-queue_name (	R	queueName9
-HeaderEntry
-key (	Rkey
-value (	Rvalue:8"5
+queue_name (	R	queueName"5
 ListQueuesResponse
 queue_names (	R
 queueNames">
 ListExchangesResponse%
-exchange_names (	RexchangeNames":
-ListBindingsRequest#
-exchange_name (	RexchangeName"7
-ListBindingsResponse
-queue_names (	R
-queueNames"J
+exchange_names (	RexchangeNames"J
 ConsumeRequest
 
 queue_name (	R	queueName
-auto_ack (RautoAck"Ù
-ProduceRequest;
-header (2#.ruuster.ProduceRequest.HeaderEntryRheader#
-exchange_name (	RexchangeName*
-payload (2.ruuster.MessageRpayload9
-HeaderEntry
-key (	Rkey
-value (	Rvalue:8" 
+auto_ack (RautoAck"~
+ProduceRequest-
+metadata (2.ruuster.MetadataRmetadata#
+exchange_name (	RexchangeName
+payload (	Rpayload" 
 
 AckRequest
 uuid (	Ruuid"-
 AckMessageBulkRequest
-uuids (	Ruuids2ñ
+uuids (	Ruuids2Ó
 Ruuster<
 QueueDeclare.ruuster.QueueDeclareRequest.ruuster.EmptyB
-ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.EmptyJ
-BindQueueToExchange#.ruuster.BindQueueToExchangeRequest.ruuster.Empty9
+ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.Empty,
+Bind.ruuster.BindRequest.ruuster.Empty9
 
 ListQueues.ruuster.Empty.ruuster.ListQueuesResponse?
 ListExchanges.ruuster.Empty.ruuster.ListExchangesResponse2

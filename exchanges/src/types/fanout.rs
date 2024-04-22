@@ -17,14 +17,11 @@ impl FanoutExchange {
         }
     }
 }
+
 impl PushToQueueStrategy for FanoutExchange {}
 
 impl Exchange for FanoutExchange {
-    fn bind(
-        &mut self,
-        queue_name: &QueueName,
-        _metadata: &QueueMetadata,
-    ) -> Result<(), ExchangeError> {
+    fn bind(&mut self, queue_name: &QueueName, _metadata: Option<&Metadata>) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
             return Err(ExchangeError::BindFail);
         }
@@ -37,12 +34,9 @@ impl Exchange for FanoutExchange {
 
     fn handle_message(
         &self,
-        message: &Option<Message>,
-        queues: Arc<RwLock<QueueContainer>>,
+        message: Message,
+        queues: Arc<RwLock<QueueContainer>>
     ) -> Result<u32, ExchangeError> {
-        if message.is_none() {
-            return Err(ExchangeError::EmptyPayloadFail);
-        }
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
@@ -50,7 +44,7 @@ impl Exchange for FanoutExchange {
 
         for name in queues_names {
             if let Some(queue) = queues_read.get(&name) {
-                if self.push_to_queue(&self.exchange_name, message, queue, &name, &queues_read)?
+                if self.push_to_queue(&self.exchange_name, message.clone(), queue, &name, &queues_read)?
                     == PushResult::Ok
                 {
                     pushed_counter += 1;
@@ -67,11 +61,14 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use lazy_static::lazy_static;
-    lazy_static! {
-        static ref MAP: HashMap<String, String> = HashMap::new();
-    }
+    // use lazy_static::lazy_static;
+    // lazy_static! {
+    //     static ref DUMMY_METADATA: Metadata = Metadata{ routing_key: None };
+    // }
 
+    /**
+     * Creates 3 queues with names: "q1", "q2", "q3"
+     */
     fn setup_test_queues() -> Arc<RwLock<QueueContainer>> {
         let queues = Arc::new(RwLock::new(QueueContainer::new()));
         let mut queues_write = queues.write().unwrap();
@@ -85,18 +82,18 @@ mod tests {
     #[test]
     fn bind_test() {
         let mut ex = FanoutExchange::default();
-        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string(), &MAP), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), None), Ok(()));
         assert_eq!(ex.get_bound_queue_names().len(), 3);
     }
 
     #[test]
     fn duplicates_bind_test() {
         let mut ex = FanoutExchange::default();
-        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
-        assert!(ex.bind(&"q1".to_string(), &MAP).is_err());
-        assert!(ex.bind(&"q1".to_string(), &MAP).is_err());
+        assert_eq!(ex.bind(&"q1".to_string(), None), Ok(()));
+        assert!(ex.bind(&"q1".to_string(), None).is_err());
+        assert!(ex.bind(&"q1".to_string(), None).is_err());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
     }
 
@@ -105,19 +102,19 @@ mod tests {
         let queues = setup_test_queues();
         let mut ex = FanoutExchange::default();
 
-        assert_eq!(ex.bind(&"q1".to_string(), &MAP), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string(), &MAP), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string(), &MAP), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), None), Ok(()));
 
-        let message = Some(Message {
+        let message = Message {
             uuid: Uuid::new_v4().to_string(),
-            header: MAP.clone(),
             payload: "#abadcaffe".to_string(),
-        });
+            metadata: None
+        };
 
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
-        assert_eq!(ex.handle_message(&message, queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
+        assert_eq!(ex.handle_message(message, queues.clone()), Ok(3u32));
 
         let queues_read = queues.read().unwrap();
         for (_, queue_mutex) in queues_read.iter() {
@@ -137,31 +134,31 @@ mod tests {
         );
         drop(queues_write);
         let mut ex = FanoutExchange::new("fanout_test".into());
-        let _ = ex.bind(&"q1".to_string(), &ExchangeMetadata::new());
+        let _ = ex.bind(&"q1".to_string(), None);
 
         // add the messages up to the limit
         for _ in 1..=1000 {
             let _ = ex
                 .handle_message(
-                    &(Some(Message {
+                    Message {
                         uuid: Uuid::new_v4().to_string(),
-                        header: HashMap::new(),
                         payload: "#abadcaffe".to_string(),
-                    })),
-                    queues.clone(),
+                        metadata: None
+                    },
+                    queues.clone()
                 )
                 .unwrap();
         }
 
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
-            header: HashMap::new(),
             payload: "#abadcaffe".to_string(),
+            metadata: None
         };
 
         // act
         let _ = ex
-            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .handle_message(one_too_many_message.clone(), queues.clone())
             .unwrap();
 
         // assert
@@ -184,31 +181,31 @@ mod tests {
         assert!(dead_letter_queue.is_none());
 
         let mut ex = FanoutExchange::new("fanout_test".into());
-        let _ = ex.bind(&"q1".to_string(), &ExchangeMetadata::new());
+        let _ = ex.bind(&"q1".to_string(), None);
 
         // add the messages up to the limit
         for _ in 1..=1000 {
             let _ = ex
                 .handle_message(
-                    &(Some(Message {
+                    Message {
                         uuid: Uuid::new_v4().to_string(),
-                        header: HashMap::new(),
                         payload: "#abadcaffe".to_string(),
-                    })),
-                    queues.clone(),
+                        metadata: None
+                    },
+                    queues.clone()
                 )
                 .unwrap();
         }
 
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
-            header: HashMap::new(),
             payload: "#abadcaffe".to_string(),
+            metadata: None
         };
 
         // act
         let message_handled_by_queues_count = ex
-            .handle_message(&(Some(one_too_many_message.clone())), queues.clone())
+            .handle_message(one_too_many_message, queues.clone())
             .unwrap();
 
         // assert
