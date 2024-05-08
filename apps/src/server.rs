@@ -2,7 +2,7 @@ use std::fs;
 
 use protos::ruuster_server::RuusterServer;
 
-use ruuster_grpc::queues::RuusterQueues;
+use ruuster_grpc::RuusterQueuesGrpc;
 use tonic::transport::Server;
 
 const SERVER_IP: &str = "127.0.0.1";
@@ -12,7 +12,7 @@ const SERVER_PORT: &str = "50051";
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
     let addr = format!("{}:{}", SERVER_IP, SERVER_PORT).parse().unwrap();
-    let ruuster_queue_service = RuusterQueues::new();
+    let ruuster_queue_service = RuusterQueuesGrpc::new();
     let current_dir = std::env::current_dir()?;
     let ruuster_descriptor_path = current_dir
         .join("protos")

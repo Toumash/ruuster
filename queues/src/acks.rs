@@ -34,7 +34,7 @@ pub enum AckStatus {
 /// # Examples
 ///
 /// ```
-/// use ruuster_grpc::acks::{AckRecord, AckStatus};
+/// use queues::acks::{AckRecord, AckStatus};
 /// use protos::Message;
 /// use std::time::{Duration, Instant};
 ///
@@ -107,7 +107,7 @@ impl AckRecord {
 /// AckContainer has few methods for controlling AckRecords collection
 /// # Examples:
 /// ```
-/// use ruuster_grpc::acks::{AckContainer, AckStatus, ApplyAck};
+/// use queues::acks::{AckContainer, AckStatus, ApplyAck};
 /// use protos::Message;
 /// use std::time::{Duration, Instant};
 /// use std::collections::HashMap;
