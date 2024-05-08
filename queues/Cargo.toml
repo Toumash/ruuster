@@ -1,23 +1,17 @@
 [package]
-name = "apps"
+name = "queues"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[[bin]]
-name = "server"
-path = "./src/server.rs"
-
 [dependencies]
-log = "0.4.21"
 tonic = "0.11.0"
-tonic-reflection = "0.11.0"
+log = "0.4.21"
 tokio = { version = "1.37.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
-tokio-stream = "0.1.15"
+tokio-stream = { version = "0.1.15", features = ["net"] }
 uuid = { version = "1.8.0", features = ["v4"]}
-env_logger = "0.11.3"
-exchanges = { path = "../exchanges" }
-ruuster-grpc = { path = "../ruuster_grpc" }
+
 protos = { path = "../protos" }
-utils = { path = "../utils" }
+exchanges = { path = "../exchanges" }
+

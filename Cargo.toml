@@ -1,11 +1,12 @@
 [workspace]
 
 members = [
+    "queues",
     "exchanges",
     "protos",
     "ruuster_grpc",
     "utils",
-    "apps",
+    "apps"
 ]
 
 resolver = "2"

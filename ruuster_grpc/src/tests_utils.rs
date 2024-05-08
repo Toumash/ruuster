@@ -11,7 +11,7 @@ use tonic::transport::{Channel, Server};
 use protos::ruuster_client::RuusterClient;
 use protos::ruuster_server::RuusterServer;
 
-use crate::queues::QueueName;
+use queues::queues::QueueName;
 
 use super::*;
 use utils::generate_random_string;
@@ -28,7 +28,7 @@ async fn setup_server() -> SocketAddr {
 
     let listener = TcpListener::bind(TEST_SERVER_ADDR).await.unwrap();
     let addr = listener.local_addr().unwrap();
-    let ruuster_queue_service = RuusterQueues::new();
+    let ruuster_queue_service = RuusterQueuesGrpc::new();
 
     tokio::spawn(async move {
         Server::builder()

@@ -9,12 +9,12 @@ path = "src/exchanges.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-prost = "0.12.3"
-tonic = "0.10.2"
-uuid = { version = "1.6.1", features = ["v4"]}
+prost = "0.12.4"
+tonic = "0.11.0"
+uuid = { version = "1.8.0", features = ["v4"]}
 protos = { path = "../protos" }
-serde = "1.0.196"
-serde_json = "1.0.113"
-log = "0.4.20"
+serde = "1.0.201"
+serde_json = "1.0.117"
+log = "0.4.21"
 lazy_static = "1.4.0"
 env_logger = "0.11.3"

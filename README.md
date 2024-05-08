@@ -26,9 +26,10 @@ RUST_LOG=debug cargo run --bin client
 
 | Crate        | Description                                                     | 
 |--------------|:----------------------------------------------------------------|
+| queues       | core ruuster functionalities (queues, acks)
 | exchanges    | library definig exchangers behavior / logic of message trasport | 
 | protos       | library with definitions of gRPC services (proto files)         |
-| ruuster-qrpc | library that will contain implementation of gRPC server         |
+| ruuster-qrpc | library containing implementation of gRPC server         |
 | utils        | library with common utilities                                   |
 | apps         | crate containing binaries built using our project               |
 
