@@ -10,13 +10,21 @@ name = "server"
 path = "./src/server.rs"
 
 [dependencies]
-log = "0.4.21"
+opentelemetry = { version = "0.23" }
+opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
+opentelemetry-otlp = { version = "0.16", features = ["tonic"] }
+opentelemetry-semantic-conventions = { version = "0.15" }
+opentelemetry-stdout = { version = "0.2.0", features = ["trace"] }
+
+tracing = "0.1"
+tracing-opentelemetry = "0.24"
+tracing-subscriber = "0.3"
+
 tonic = "0.11.0"
 tonic-reflection = "0.11.0"
 tokio = { version = "1.37.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1.15"
 uuid = { version = "1.8.0", features = ["v4"]}
-env_logger = "0.11.3"
 exchanges = { path = "../exchanges" }
 ruuster-grpc = { path = "../ruuster_grpc" }
 protos = { path = "../protos" }

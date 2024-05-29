@@ -6,6 +6,8 @@ use std::{
 use protos::Message;
 use tonic::Status;
 
+use tracing as log;
+
 type UuidSerialized = String;
 
 pub type AckContainer = HashMap<UuidSerialized, AckRecord>;
