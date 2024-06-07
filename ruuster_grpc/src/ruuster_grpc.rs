@@ -8,6 +8,7 @@ use queues::queues::RuusterQueues;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
+use tracing::instrument;
 
 pub struct RuusterQueuesGrpc(RuusterQueues);
 
@@ -19,6 +20,7 @@ impl RuusterQueuesGrpc {
 
 #[tonic::async_trait]
 impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
+    #[instrument(skip_all, fields(request=?request))]
     async fn queue_declare(
         &self,
         request: tonic::Request<QueueDeclareRequest>,
@@ -30,6 +32,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
     async fn exchange_declare(
         &self,
         request: tonic::Request<ExchangeDeclareRequest>,
@@ -44,6 +47,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
+    #[instrument(skip_all)]
     async fn list_queues(
         &self,
         _request: tonic::Request<Empty>,
@@ -52,6 +56,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(ListQueuesResponse { queue_names }))
     }
 
+    #[instrument(skip_all)]
     async fn list_exchanges(
         &self,
         _request: tonic::Request<Empty>,
@@ -60,6 +65,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(ListExchangesResponse { exchange_names }))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
     async fn bind(
         &self,
         request: tonic::Request<BindRequest>,
@@ -94,6 +100,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(async_receiver))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
     async fn consume_one(
         &self,
         request: tonic::Request<ConsumeRequest>,
@@ -105,6 +112,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(message))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
     async fn produce(
         &self,
         request: tonic::Request<ProduceRequest>,
@@ -115,6 +123,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
+    #[instrument(skip_all)]
     async fn ack_message(
         &self,
         _request: tonic::Request<AckRequest>,
@@ -124,6 +133,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
     async fn ack_message_bulk(
         &self,
         request: tonic::Request<AckMessageBulkRequest>,

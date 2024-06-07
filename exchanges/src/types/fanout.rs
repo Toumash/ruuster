@@ -56,7 +56,7 @@ impl Exchange for FanoutExchange {
                 {
                     pushed_counter += 1;
                 }
-                info!("message pushed to: {}", &self.exchange_name);
+                info!(queue_name=%name, "message pushed");
             }
         }
 
