@@ -1,28 +1,19 @@
 use std::fs;
-
 use protos::ruuster_server::RuusterServer;
-
 use ruuster_grpc::RuusterQueuesGrpc;
 use tonic::transport::Server;
-
-use opentelemetry::{
-    trace::TraceError,
-    KeyValue,
-};
+use opentelemetry::{trace::TraceError, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
+use opentelemetry_sdk::{
+    runtime, trace as sdktrace, Resource,
+};
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
+use tracing::info;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
-use tracing::{info, span};
 
-// use tracing::{error, span};
-// use tracing_subscriber::layer::SubscriberExt;
-// use tracing_subscriber::Registry;
 const SERVER_IP: &str = "127.0.0.1";
 const SERVER_PORT: &str = "50051";
-
-
 
 fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
     opentelemetry_otlp::new_pipeline()
@@ -35,28 +26,18 @@ fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
         .with_trace_config(
             sdktrace::config().with_resource(Resource::new(vec![KeyValue::new(
                 SERVICE_NAME,
-                "tracing-jaeger",
+                "ruuster-tracer",
             )])),
         )
         .install_batch(runtime::Tokio)
 }
 
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
-    
     let tracer = init_tracer().expect("Failed to initialize tracer.");
-    // Create a new OpenTelemetry trace pipeline that prints to stdout
-
-
-    // Create a tracing layer with the configured tracer
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-
-    // // Use the tracing subscriber `Registry`, or any other subscriber
-    // // that impls `LookupSpan`
     let subscriber = Registry::default().with(telemetry);
-
+    tracing::subscriber::set_global_default(subscriber)?;
 
     let addr = format!("{}:{}", SERVER_IP, SERVER_PORT).parse().unwrap();
     let ruuster_queue_service = RuusterQueuesGrpc::new();
@@ -71,15 +52,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let reflection_service = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(&ruuster_descriptor_content)
         .build()?;
-
-    // Trace executed code
-    tracing::subscriber::with_default(subscriber, || {
-        // Spans will be sent to the configured OpenTelemetry exporter
-        let root = span!(tracing::Level::TRACE, "app_start", work_units = 2);
-        let _enter = root.enter();
-
+    {
+        let span = tracing::info_span!("app_start");
+        let _enter = span.enter();
         info!("starting server on address: {}", &addr);
-    });
+    }
 
     Server::builder()
         .add_service(RuusterServer::new(ruuster_queue_service))
@@ -87,5 +64,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .serve(addr)
         .await?;
 
-        Ok(())
+    Ok(())
 }
