@@ -10,15 +10,15 @@
 1. Build & run in the terminal
 
 ```rs
-# to run the server
-cargo watch -x 'run --bin server'
+// to run the server
+cargo run --bin server --release'
+```
 
-# to run the client
-cargo run --bin client
+```bash
+# to run docker for local tracing and metrics
+docker run -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 -p14268:14268 -p4317:4317 jaegertracing/all-in-one:latest
 
-
-# to run with a specified log level
-RUST_LOG=debug cargo run --bin client
+# then enter http://localhost:16686 to open Jaeger UI
 ```
 ---
 # Ruuster workspace
