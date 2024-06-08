@@ -280,7 +280,7 @@ impl RuusterQueues {
         Ok(())
     }
 
-    #[instrument(skip(self), fields(queue_name=%queue_name))]
+    #[instrument(skip_all, fields(queue_name=%queue_name, auto_ack=%auto_ack))]
     pub fn consume_message(
         &self,
         queue_name: &QueueName,
