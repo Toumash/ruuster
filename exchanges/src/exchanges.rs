@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use protos::ruuster::Message;
@@ -66,7 +67,11 @@ impl fmt::Display for ExchangeError {
 }
 
 pub trait Exchange {
-    fn bind(&mut self, queue_name: &QueueName, metadata: Option<&Metadata>) -> Result<(), ExchangeError>;
+    fn bind(
+        &mut self,
+        queue_name: &QueueName,
+        metadata: Option<&Metadata>,
+    ) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
         &self,
@@ -139,16 +144,18 @@ pub(crate) trait PushToQueueStrategy {
             log::warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                 // FIXME: use the deadletter queue defined per exchange
-                log::debug!("moving the message {} to the dead letter queue", message.uuid);
+                log::debug!(
+                    "moving the message {} to the dead letter queue",
+                    message.uuid
+                );
 
                 // FIXME: convert to ruuster headers
-                let val = json!({
-                    "count": 1,
-                    "exchange": exchange_name,
-                    "original_message": message.payload,
-                    "reason": "max_len",
-                    "time": timestamp,
-                    "queue": name.to_string(),
+                let val = json!(DeadLetterMessage {
+                    count: 1,
+                    exchange: exchange_name.to_string(),
+                    original_message: message.payload,
+                    time: timestamp,
+                    queue: name.to_string()
                 })
                 .to_string();
 
@@ -158,7 +165,7 @@ pub(crate) trait PushToQueueStrategy {
                     .push_back(Message {
                         uuid: message.uuid,
                         payload: val,
-                        metadata: None
+                        metadata: None,
                     });
             } else {
                 log::debug!("message {} dropped", message.uuid);
@@ -169,4 +176,13 @@ pub(crate) trait PushToQueueStrategy {
             return Ok(PushResult::Ok);
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct DeadLetterMessage {
+    count: i32,
+    exchange: String,
+    original_message: String,
+    time: i64,
+    queue: String,
 }
