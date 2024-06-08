@@ -6,6 +6,8 @@ use std::{
 use protos::Message;
 use tonic::Status;
 
+use tracing::{self as log, error, info, instrument, warn};
+
 type UuidSerialized = String;
 
 pub type AckContainer = HashMap<UuidSerialized, AckRecord>;
@@ -163,43 +165,46 @@ pub trait ApplyAck {
 }
 
 impl ApplyAck for AckContainer {
+    #[instrument(skip_all, fields(uuid=%uuid))]
     fn clear_unused_record(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get(uuid) {
             if record.get_counter() <= 0 {
-                log::debug!("deleting ack record for message with uuid: {}", uuid);
+                info!("deleting ack record");
                 self.remove(uuid);
             }
             return Ok(());
         }
-        let msg = format!("ack record for message with uuid: {} not found", uuid);
-        log::debug!("{}", &msg);
-        Err(Status::not_found(&msg))
+        warn!("ack record not found");
+        Err(Status::not_found("ack record not found"))
     }
 
+    #[instrument(skip_all, fields(uuid=%message.uuid, duartion=?duration))]
     fn add_record(&mut self, message: Message, duration: Duration) {
         let uuid = message.uuid.to_owned();
-
+        info!("adding ack record");
         self.entry(uuid)
             .and_modify(|elem| {
                 elem.increment_counter();
+                info!("ack record incremented");
             })
             .or_insert(AckRecord::new(message, Instant::now(), duration));
     }
 
+    #[instrument(skip_all, fields(uuid=%uuid))]
     fn apply_ack(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get_mut(uuid) {
             record.apply_ack().map_err(|e| {
-                let msg = format!("appling ack for message failed: {:?}", e);
-                log::error!("{}", &msg);
-                Status::internal(&msg)
+                error!(error=?e, "appling ack failed");
+                Status::internal("appling ack failed")
             })?;
+            info!("ack applied");
             return Ok(());
         }
-        let msg = format!("ack record for message with uuid: {} not found", uuid);
-        log::debug!("{}", &msg);
-        Err(Status::not_found(&msg))
+        warn!("ack record not found");
+        Err(Status::not_found("ack record not found"))
     }
 
+    #[instrument(skip_all, fields(uuids=?uuids))]
     fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status> {
         for item in uuids {
             self.apply_ack(item)?;
@@ -207,6 +212,7 @@ impl ApplyAck for AckContainer {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     fn clear_all_unused_records(&mut self) -> Result<(), Status> {
         self.retain(|_, value| value.get_counter() > 0);
         Ok(())

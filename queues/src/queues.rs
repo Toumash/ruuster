@@ -4,6 +4,7 @@ use protos::{Message, Metadata};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
+use tracing::{self, error, info, info_span, instrument, warn, Instrument};
 use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
@@ -41,142 +42,147 @@ impl RuusterQueues {
         Self::default()
     }
 
+    // NOTICE: for some reason function parameters must be explicitly specified
+    //         eg.: #[instrument(skip(self))] should work exactly the same
+    //         but filtering by tag is broken then even tho queue_name is properly added to tags of span
+    //         I suspect that it is some kind of bug on Jaeger side
+    #[instrument(skip_all, fields(queue_name=%queue_name))]
     pub fn add_queue(&self, queue_name: &QueueName) -> Result<(), Status> {
-        log::debug!("adding queue: {}", &queue_name);
+        info!("adding queue");
         let mut queues_write = self.queues.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire queue exclusive-lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "queues are unavailable");
+            Status::unavailable("queues are unavailable")
         })?;
 
         if queues_write.get(queue_name).is_some() {
-            return Err(RuusterQueues::log_status(
-                &format!("queue {} already exists", queue_name),
-                tonic::Code::AlreadyExists,
-            ));
+            warn!("queue already exists");
+            return Err(Status::already_exists("queue already exists"));
         }
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
-        
-        log::debug!("queue: {} added", &queue_name);
+
+        info!("queue added");
         Ok(())
     }
 
+    #[instrument(skip_all, fields(queue_name=%queue_name))]
     pub fn get_queue(&self, queue_name: &QueueName) -> Result<Arc<Mutex<Queue>>, Status> {
         let queues_read = self.queues.read().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acuire queues read-only lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "queue is unavailable");
+            Status::unavailable("queues is unavailable")
         })?;
 
         match queues_read.get(queue_name) {
             Some(queue) => Ok(queue.clone()),
-            None => Err(RuusterQueues::log_status(
-                &format!("queue {} not found", queue_name),
-                tonic::Code::Unavailable,
-            )),
+            None => {
+                error!("queue not found");
+                Err(Status::not_found("queue not found"))
+            }
         }
     }
 
+    #[instrument(skip_all, fields(exchange_name=%exchange_name, exchange_kind=%exchange_kind))]
     pub fn add_exchange(
         &self,
         exchange_name: &ExchangeName,
         exchange_kind: ExchangeKind,
     ) -> Result<(), Status> {
-        log::debug!("adding exchange: {}", &exchange_name);
+        info!("adding exchange");
         let mut exchanges_write = self.exchanges.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acuire exchange exclusive-lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "exchanges are unavailable");
+            Status::unavailable("exchanges are unavailable")
         })?;
 
         if exchanges_write.get(exchange_name).is_some() {
-            return Err(RuusterQueues::log_status(
-                &format!("exchange {} already exists", exchange_name),
-                tonic::Code::AlreadyExists,
-            ));
+            warn!("exchange already exists");
+            return Err(Status::already_exists("exchange already exists"));
         }
 
         exchanges_write.insert(exchange_name.to_owned(), exchange_kind.create());
 
-        log::debug!("exchange: {} added", &exchange_name);
-
+        info!("exchange added");
         Ok(())
     }
 
+    #[instrument(skip_all, fields(exchange_name=%exchange_name))]
     pub fn get_exchange(
         &self,
         exchange_name: &ExchangeName,
     ) -> Result<Arc<RwLock<ExchangeType>>, Status> {
         let exchanges_read = self.exchanges.read().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire exchanges read-only lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "exchange is unavailable");
+            Status::unavailable("exchange is unavailable")
         })?;
 
         match exchanges_read.get(exchange_name) {
             Some(exchange) => Ok(exchange.clone()),
-            None => Err(RuusterQueues::log_status(
-                &format!("exchange {} not found", exchange_name),
-                tonic::Code::Unavailable,
-            )),
+            None => {
+                error!("exchange not found");
+                Err(Status::not_found("exchange not found"))
+            }
         }
     }
 
+    #[instrument(skip_all)]
     pub fn get_queues_list(&self) -> Result<Vec<QueueName>, Status> {
+        info!("gathering queues list");
         let queues_read = self.queues.read().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire queues read-only lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "queues are unavailable");
+            Status::unavailable("queues are unavaiable")
         })?;
-        Ok(queues_read.iter().map(|queue| queue.0.clone()).collect())
+        let result = queues_read.iter().map(|queue| queue.0.clone()).collect();
+        info!("queues list gathered correctly");
+        Ok(result)
     }
 
+    #[instrument(skip_all)]
     pub fn get_exchanges_list(&self) -> Result<Vec<ExchangeName>, Status> {
+        info!("gathering exchanges list");
         let exchanges_read = self.exchanges.read().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire exchanges read-only lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "exchanges are unavaiable");
+            Status::unavailable("exchanges are unavaiable")
         })?;
-        Ok(exchanges_read
+        let result = exchanges_read
             .iter()
             .map(|exchange| exchange.0.clone())
-            .collect())
+            .collect();
+        info!("exchanges list gathered correctly");
+        Ok(result)
     }
 
     pub fn bind_queue_to_exchange(
         &self,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
-        metadata: Option<&Metadata>
+        metadata: Option<&Metadata>,
     ) -> Result<(), Status> {
-        log::debug!("binding queue: {} to exchange: {}", queue_name, exchange_name);
+        let _span = match &metadata {
+            Some(md) => info_span!(
+                "bind_queue_to_exchange",
+                queue_name = %queue_name,
+                exchange_name=%exchange_name,
+                metadata=%md
+            )
+            .entered(),
+            None => info_span!(
+                "bind_queue_to_exchange",
+                queue_name=%queue_name,
+                exchange_name=%exchange_name
+            )
+            .entered(),
+        };
+
+        info!("started binding");
         let exchange = self.get_exchange(exchange_name)?;
         let mut exchange_write = exchange.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!(
-                    "failed to acquire exchange {} exclusive lock: {}",
-                    exchange_name, e
-                ),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "exchange is unavaiable");
+            Status::unavailable("exchange is unavaiable")
         })?;
         exchange_write.bind(queue_name, metadata).map_err(|e| {
-            RuusterQueues::log_status(
-                &format!(
-                    "failed to bind queue {} to exchange {}: {}",
-                    queue_name, exchange_name, e
-                ),
-                tonic::Code::Internal,
-            )
+            error!(error=%e, "failed to bind");
+            Status::internal("failed to bind")
         })?;
-        log::debug!("binding queue: {} to exchange: {} completed", queue_name, exchange_name);
+        info!("binding completed");
         Ok(())
     }
 
@@ -184,81 +190,103 @@ impl RuusterQueues {
         &self,
         payload: Payload,
         exchange_name: &ExchangeName,
-        metadata: Option<Metadata>
+        metadata: Option<Metadata>,
     ) -> Result<u32, Status> {
-        let uuid = Uuid::new_v4().to_string();
-        log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
+        let uuid_str = Uuid::new_v4().to_string();
+
+        let _span = match &metadata {
+            Some(md) => info_span!(
+                "forward_message",
+                uuid = %uuid_str,
+                exchange_name=%exchange_name,
+                metadata=%md
+            )
+            .entered(),
+            None => info_span!(
+                "forward_message",
+                uuid = %uuid_str,
+                exchange_name=%exchange_name
+            )
+            .entered(),
+        };
+
+        info!("creating message");
         let exchange = self.get_exchange(exchange_name)?;
 
         let result = {
             let exchange_read = exchange.read().map_err(|e| {
-                RuusterQueues::log_status(
-                    &format!("failed to acquire exchanges lock: {}", e),
-                    tonic::Code::Unavailable,
-                )
+                error!(error=%e, "exchange is unavaiable");
+                Status::unavailable("exchange is unavaiable")
             })?;
 
-            let message = Message { uuid: uuid.clone(), payload, metadata };
+            let message = Message {
+                uuid: uuid_str.clone(),
+                payload,
+                metadata,
+            };
 
             exchange_read
                 .handle_message(message, self.queues.clone())
                 .map_err(|e| {
-                    RuusterQueues::log_status(
-                        &format!("failed to handle message: {}", e),
-                        tonic::Code::Internal,
-                    )
+                    error!(error=%e, "failed to handle message");
+                    Status::internal("failed to handle message")
                 })
         };
-        log::debug!("message forwarding completed (uuid: {}, exchange: {})", uuid, exchange_name);
+        info!("message handling completed");
         result
     }
 
     fn get_acks(&self) -> Result<RwLockWriteGuard<'_, AckContainer>, Status> {
         let acks = self.acks.write().map_err(|e| {
-            RuusterQueues::log_status(
-                &format!("failed to acquire acks lock: {}", e),
-                tonic::Code::Unavailable,
-            )
+            error!(error=%e, "acks are unavaiable");
+            Status::unavailable("acks are unavaiable")
         })?;
 
         Ok(acks)
     }
 
+    #[instrument(skip_all, fields(uuid = %uuid))]
     pub fn apply_message_ack(&self, uuid: UuidSerialized) -> Result<(), Status> {
-        log::debug!("single message ack for msg with uuid: {}", &uuid);
+        info!("started single message ack");
         let mut acks = self.get_acks()?;
 
         acks.apply_ack(&uuid)?;
         acks.clear_unused_record(&uuid)?;
-        log::debug!("ack for message with uuid: {} completed", &uuid);
+        info!("ack completed");
         Ok(())
     }
 
+    #[instrument(skip_all)]
     pub fn apply_message_bulk_ack(&self, uuids: &[UuidSerialized]) -> Result<(), Status> {
-        log::debug!("acking multiple messages");
+        info!("acking multiple messages");
         let mut acks = self.get_acks()?;
         acks.apply_bulk_ack(uuids)?;
         acks.clear_all_unused_records()?;
-        log::debug!("acking multiple messages completed, acked uuids: {:#?}", uuids);
+        info!(
+            "acking multiple messages completed, acked uuids: {:#?}",
+            uuids
+        );
         Ok(())
     }
 
+    #[instrument(skip_all, fields(uuid=%message.uuid, duration=?duration))]
     fn track_message_delivery(
         acks: &mut AckContainer,
         message: Message,
         duration: Duration,
     ) -> Result<(), Status> {
-        log::debug!("started tracking delivery for message: {}", &message.uuid);
+        info!("started tracking delivery");
         acks.add_record(message, duration);
         Ok(())
     }
 
+    #[instrument(skip_all, fields(queue_name=%queue_name, auto_ack=%auto_ack))]
     pub fn consume_message(
         &self,
         queue_name: &QueueName,
         auto_ack: bool,
     ) -> Result<Message, Status> {
-        log::debug!("started consuming single message from queue: {}", queue_name);
+        info!("started consuming single message");
         let queue = self.get_queue(queue_name)?;
         let mut acks = self.get_acks()?;
 
@@ -266,10 +294,8 @@ impl RuusterQueues {
             queue
                 .lock()
                 .map_err(|e| {
-                    RuusterQueues::log_status(
-                        &format!("failed to acuire queue lock: {}", e),
-                        tonic::Code::Unavailable,
-                    )
+                    error!(error=%e, "queue is unavaiable");
+                    Status::unavailable("queue is unavaiable")
                 })?
                 .pop_front()
         };
@@ -284,7 +310,7 @@ impl RuusterQueues {
                         DEFAULT_ACK_DURATION,
                     )?;
                 }
-                log::debug!("consuming single message from queue: {} completed", queue_name);
+                info!(uuid = &msg.uuid, "consuming single message completed");
                 Ok(msg)
             }
             None => Err(Status::not_found("failed to return message")),
@@ -296,11 +322,19 @@ impl RuusterQueues {
         queue_name: &QueueName,
         auto_ack: bool,
     ) -> ReceiverStream<Result<Message, Status>> {
-        log::debug!("spawning consuming task for queue: {}", queue_name);
         let (tx, rx) = mpsc::channel(4);
         let queues = self.queues.clone();
         let queue_name = queue_name.clone();
         let acks_arc = self.acks.clone();
+
+        let span = info_span!(
+            "start_consuming_task",
+            queue_name=%queue_name,
+            auto_ack=%auto_ack
+        );
+        let _ = span.in_scope(|| {
+            info!("spawning consuming task");
+        });
 
         tokio::spawn(async move {
             loop {
@@ -311,7 +345,7 @@ impl RuusterQueues {
                         Some(queue) => queue,
                         None => {
                             let msg = "requested queue doesn't exist";
-                            log::error!("{}", msg);
+                            error!("{}", msg);
                             return Status::not_found(msg);
                         }
                     };
@@ -330,22 +364,19 @@ impl RuusterQueues {
                             DEFAULT_ACK_DURATION,
                         );
                     }
-                   
+
                     if let Err(e) = tx.send(Ok(message)).await {
-                        let msg = format!("error while sending message to channel: {}", e);
-                        log::error!("{}", msg);
+                        let msg = format!("error while sending message to channel");
+                        error!(error=%e, "{}", msg);
                         return Status::internal(msg);
                     }
-                    log::debug!("message from queue: {} correclty sent over channel", queue_name);
+                    info!("message correclty sent over channel");
                 } else {
                     tokio::task::yield_now().await;
                 }
             }
-        });
+        }.instrument(span)
+        );
         ReceiverStream::new(rx)
-    }
-
-    fn log_status(message: &String, code: tonic::Code) -> Status {
-        Status::new(code, message)
     }
 }

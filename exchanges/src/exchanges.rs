@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt;
+use std::fmt::{self, Display};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -7,6 +7,7 @@ use serde_json::json;
 
 use protos::ruuster::Message;
 use protos::ruuster::Metadata;
+use tracing::{debug, error, warn};
 use types::{DirectExchange, FanoutExchange};
 
 pub mod types;
@@ -91,7 +92,7 @@ impl From<i32> for ExchangeKind {
             0 => ExchangeKind::Fanout,
             1 => ExchangeKind::Direct,
             wrong_value => {
-                log::error!(
+                error!(
                     "value {} is not correct ExchangeKind, will use Fanout",
                     wrong_value
                 );
@@ -106,6 +107,15 @@ impl From<ExchangeKind> for i32 {
         match value {
             ExchangeKind::Fanout => 0,
             ExchangeKind::Direct => 1,
+        }
+    }
+}
+
+impl Display for ExchangeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            ExchangeKind::Fanout => write!(f, "{}", "ExchangeKind::Fanout"),
+            ExchangeKind::Direct => write!(f, "{}", "ExchangeKind::Direct"),
         }
     }
 }
@@ -136,10 +146,10 @@ pub(crate) trait PushToQueueStrategy {
 
         let queue_lock = &mut queue.lock().unwrap();
         if queue_lock.len() >= QUEUE_MAX_LENGTH {
-            log::warn!("queue size reached for queue {}", name);
+            warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                 // FIXME: use the deadletter queue defined per exchange
-                log::debug!("moving the message {} to the dead letter queue", message.uuid);
+                debug!("moving the message {} to the dead letter queue", message.uuid);
 
                 // FIXME: convert to ruuster headers
                 let val = json!({
@@ -161,7 +171,7 @@ pub(crate) trait PushToQueueStrategy {
                         metadata: None
                     });
             } else {
-                log::debug!("message {} dropped", message.uuid);
+                debug!("message {} dropped", message.uuid);
             }
             return Ok(PushResult::QueueOverflow);
         } else {
