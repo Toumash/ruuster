@@ -58,7 +58,7 @@ impl RuusterQueues {
         }
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
-        
+
         log::debug!("queue: {} added", &queue_name);
         Ok(())
     }
@@ -154,9 +154,13 @@ impl RuusterQueues {
         &self,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
-        metadata: Option<&Metadata>
+        metadata: Option<&Metadata>,
     ) -> Result<(), Status> {
-        log::debug!("binding queue: {} to exchange: {}", queue_name, exchange_name);
+        log::debug!(
+            "binding queue: {} to exchange: {}",
+            queue_name,
+            exchange_name
+        );
         let exchange = self.get_exchange(exchange_name)?;
         let mut exchange_write = exchange.write().map_err(|e| {
             RuusterQueues::log_status(
@@ -176,7 +180,11 @@ impl RuusterQueues {
                 tonic::Code::Internal,
             )
         })?;
-        log::debug!("binding queue: {} to exchange: {} completed", queue_name, exchange_name);
+        log::debug!(
+            "binding queue: {} to exchange: {} completed",
+            queue_name,
+            exchange_name
+        );
         Ok(())
     }
 
@@ -184,10 +192,14 @@ impl RuusterQueues {
         &self,
         payload: Payload,
         exchange_name: &ExchangeName,
-        metadata: Option<Metadata>
+        metadata: Option<Metadata>,
     ) -> Result<u32, Status> {
         let uuid = Uuid::new_v4().to_string();
-        log::debug!("forwarding message with uuid: {} to exchange: {}", uuid, exchange_name);
+        log::debug!(
+            "forwarding message with uuid: {} to exchange: {}",
+            uuid,
+            exchange_name
+        );
         let exchange = self.get_exchange(exchange_name)?;
 
         let result = {
@@ -198,7 +210,11 @@ impl RuusterQueues {
                 )
             })?;
 
-            let message = Message { uuid: uuid.clone(), payload, metadata };
+            let message = Message {
+                uuid: uuid.clone(),
+                payload,
+                metadata,
+            };
 
             exchange_read
                 .handle_message(message, self.queues.clone())
@@ -209,7 +225,11 @@ impl RuusterQueues {
                     )
                 })
         };
-        log::debug!("message forwarding completed (uuid: {}, exchange: {})", uuid, exchange_name);
+        log::debug!(
+            "message forwarding completed (uuid: {}, exchange: {})",
+            uuid,
+            exchange_name
+        );
         result
     }
 
@@ -239,7 +259,10 @@ impl RuusterQueues {
         let mut acks = self.get_acks()?;
         acks.apply_bulk_ack(uuids)?;
         acks.clear_all_unused_records()?;
-        log::debug!("acking multiple messages completed, acked uuids: {:#?}", uuids);
+        log::debug!(
+            "acking multiple messages completed, acked uuids: {:#?}",
+            uuids
+        );
         Ok(())
     }
 
@@ -258,7 +281,10 @@ impl RuusterQueues {
         queue_name: &QueueName,
         auto_ack: bool,
     ) -> Result<Message, Status> {
-        log::debug!("started consuming single message from queue: {}", queue_name);
+        log::debug!(
+            "started consuming single message from queue: {}",
+            queue_name
+        );
         let queue = self.get_queue(queue_name)?;
         let mut acks = self.get_acks()?;
 
@@ -276,6 +302,17 @@ impl RuusterQueues {
 
         match message {
             Some(msg) => {
+                match msg.metadata {
+                    Some(ref meta) => match &meta.ttl {
+                        Some(ttl) => {
+                            if ttl.value < 0 { // TODO: develop it further
+                                log::debug!("message dropped. ttl expired");
+                            }
+                        }
+                        None => {}
+                    },
+                    None => {}
+                }
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
                 if !auto_ack {
                     RuusterQueues::track_message_delivery(
@@ -284,7 +321,10 @@ impl RuusterQueues {
                         DEFAULT_ACK_DURATION,
                     )?;
                 }
-                log::debug!("consuming single message from queue: {} completed", queue_name);
+                log::debug!(
+                    "consuming single message from queue: {} completed",
+                    queue_name
+                );
                 Ok(msg)
             }
             None => Err(Status::not_found("failed to return message")),
@@ -330,13 +370,16 @@ impl RuusterQueues {
                             DEFAULT_ACK_DURATION,
                         );
                     }
-                   
+
                     if let Err(e) = tx.send(Ok(message)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
                         return Status::internal(msg);
                     }
-                    log::debug!("message from queue: {} correclty sent over channel", queue_name);
+                    log::debug!(
+                        "message from queue: {} correclty sent over channel",
+                        queue_name
+                    );
                 } else {
                     tokio::task::yield_now().await;
                 }

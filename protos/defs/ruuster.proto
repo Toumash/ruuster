@@ -20,8 +20,14 @@ message RoutingKey {
     string value = 1;
 }
 
+message TimeToLive {
+    int64 value = 1;
+}
+
+
 message Metadata {
     RoutingKey routing_key = 1;
+    TimeToLive ttl = 2;
 }
 
 message Message {

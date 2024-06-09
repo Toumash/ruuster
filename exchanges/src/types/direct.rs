@@ -93,8 +93,13 @@ impl Exchange for DirectExchange {
 
         for name in bound_queues {
             if let Some(queue) = queues_read.get(name) {
-                if self.push_to_queue(&self.exchange_name, message.clone(), queue, name, &queues_read)?
-                    == PushResult::Ok
+                if self.push_to_queue(
+                    &self.exchange_name,
+                    message.clone(),
+                    queue,
+                    name,
+                    &queues_read,
+                )? == PushResult::Ok
                 {
                     pushed_counter += 1;
                 }
@@ -136,6 +141,7 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "route_1".to_string(),
             }),
+            ttl: None,
         };
         assert_eq!(ex.bind(&"q1".to_string(), Some(&metadata)), Ok(()));
         assert_eq!(ex.bind(&"q2".to_string(), Some(&metadata)), Ok(()));
@@ -152,11 +158,13 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "test_1".to_string(),
             }),
+            ttl: None,
         };
         let metadata_second = Metadata {
             routing_key: Some(RoutingKey {
                 value: "test_2".to_string(),
             }),
+            ttl: None,
         };
         assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
         assert!(ex.bind(&"q1".to_string(), Some(&metadata_second)).is_ok());
@@ -172,11 +180,13 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "test".to_string(),
             }),
+            ttl: None,
         };
         let metadata_second = Metadata {
             routing_key: Some(RoutingKey {
                 value: "test".to_string(),
             }),
+            ttl: None,
         };
         assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
         assert!(ex.bind(&"q1".to_string(), Some(&metadata_second)).is_err());
@@ -191,6 +201,7 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "test".to_string(),
             }),
+            ttl: None,
         };
         assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
         assert!(ex.bind(&"q2".to_string(), Some(&metadata_first)).is_ok());
@@ -204,16 +215,18 @@ mod tests {
         });
         let queues = setup_test_queues();
         let mut ex = DirectExchange::default();
-        
+
         let metadata_first = Metadata {
             routing_key: Some(RoutingKey {
                 value: "test_1".to_string(),
             }),
+            ttl: None,
         };
         let metadata_second = Metadata {
             routing_key: Some(RoutingKey {
                 value: "test_2".to_string(),
             }),
+            ttl: None,
         };
 
         assert_eq!(ex.bind(&"q1".to_string(), Some(&metadata_first)), Ok(()));
@@ -224,7 +237,7 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_first)
+            metadata: Some(metadata_first),
         };
 
         assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
@@ -233,7 +246,7 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_second)
+            metadata: Some(metadata_second),
         };
 
         assert_eq!(ex.handle_message(message, queues.clone()), Ok(1u32));
@@ -253,6 +266,7 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "route_key".to_string(),
             }),
+            ttl: None,
         };
         let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
 
@@ -262,9 +276,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: Some(routing_metadata.clone())
+                        metadata: Some(routing_metadata.clone()),
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -272,7 +286,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(routing_metadata)
+            metadata: Some(routing_metadata),
         };
 
         // act
@@ -304,6 +318,7 @@ mod tests {
             routing_key: Some(RoutingKey {
                 value: "route_key".to_string(),
             }),
+            ttl: None,
         };
         let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
 
@@ -314,9 +329,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: Some(routing_metadata.clone())
+                        metadata: Some(routing_metadata.clone()),
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -324,7 +339,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(routing_metadata)
+            metadata: Some(routing_metadata),
         };
 
         // act
