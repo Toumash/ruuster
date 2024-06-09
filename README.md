@@ -11,9 +11,9 @@ To run you can use GitPod (super fast), devcontainers (local docker + vscode) or
 1. Run `docker compose up -d` to start logs/traces collector UI: http://localhost:16686
 1. Build & run in the terminal
 
-```rs
+```bash
 # to run the server
-cargo watch -x 'run --bin server'
+cargo watch -x 'run --bin server'  --ignore protos/ #gitpod keeps regenerating proto files
 
 # to run the client
 cargo run --bin client
