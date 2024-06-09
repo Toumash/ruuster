@@ -1,5 +1,5 @@
 
-‡
+Ñ
 ruuster.protoruuster"
 Empty""
 
@@ -23,9 +23,12 @@ routingKey%
 
 queue_name (	R	queueName"Q
 ExchangeDeclareRequest7
-exchange (2.ruuster.ExchangeDefinitionRexchange"€
-BindRequest-
-metadata (2.ruuster.MetadataRmetadata#
+exchange (2.ruuster.ExchangeDefinitionRexchange"D
+BindMetadata4
+routing_key (2.ruuster.RoutingKeyR
+routingKey"„
+BindRequest1
+metadata (2.ruuster.BindMetadataRmetadata#
 exchange_name (	RexchangeName
 
 queue_name (	R	queueName"5

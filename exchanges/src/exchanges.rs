@@ -1,13 +1,11 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 
+use internals::{DeadLetterMetadata, Message, Metadata};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
-use protos::ruuster::Message;
-use protos::ruuster::Metadata;
 use types::{DirectExchange, FanoutExchange};
 
 pub mod types;
@@ -30,7 +28,6 @@ pub enum ExchangeKind {
 pub enum ExchangeError {
     BindFail,
     EmptyPayloadFail,
-    GetSystemTimeFail {},
     DeadLetterQueueLockFail {},
     NoRouteKey,
     NoMatchingQueue { route_key: String },
@@ -44,12 +41,6 @@ impl fmt::Display for ExchangeError {
             }
             ExchangeError::EmptyPayloadFail => {
                 write!(f, "handling message failed")
-            }
-            ExchangeError::GetSystemTimeFail {} => {
-                write!(
-                    f,
-                    "handling message failed: SystemTime::now().duration_since"
-                )
             }
             ExchangeError::DeadLetterQueueLockFail {} => write!(
                 f,
@@ -70,7 +61,7 @@ pub trait Exchange {
     fn bind(
         &mut self,
         queue_name: &QueueName,
-        metadata: Option<&Metadata>,
+        metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
@@ -134,11 +125,6 @@ pub(crate) trait PushToQueueStrategy {
             HashMap<String, Arc<Mutex<VecDeque<Message>>>>,
         >,
     ) -> Result<PushResult, ExchangeError> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .map_err(|_| ExchangeError::GetSystemTimeFail {})?;
-
         let queue_lock = &mut queue.lock().unwrap();
         if queue_lock.len() >= QUEUE_MAX_LENGTH {
             log::warn!("queue size reached for queue {}", name);
@@ -148,25 +134,28 @@ pub(crate) trait PushToQueueStrategy {
                     "moving the message {} to the dead letter queue",
                     message.uuid
                 );
+                let mut meta = message.metadata.unwrap_or(Metadata {
+                    created_at: Some(Instant::now()),
+                    routing_key: None,
+                    dead_letter: None,
+                });
+                let deadletter_metadata = DeadLetterMetadata {
+                    count: Some(1),
+                    exchange: Some(exchange_name.to_string()),
+                    queue: Some(name.to_string()),
+                };
+                meta.dead_letter = Some(deadletter_metadata);
 
-                // FIXME: convert to ruuster headers
-                let val = json!(DeadLetterMessage {
-                    count: 1,
-                    exchange: exchange_name.to_string(),
-                    original_message: message.payload,
-                    time: timestamp,
-                    queue: name.to_string()
-                })
-                .to_string();
+                let message = Message {
+                    uuid: message.uuid,
+                    payload: message.payload,
+                    metadata: Some(meta),
+                };
 
                 dead_letter_queue
                     .lock()
                     .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
-                    .push_back(Message {
-                        uuid: message.uuid,
-                        payload: val,
-                        metadata: None,
-                    });
+                    .push_back(message);
             } else {
                 log::debug!("message {} dropped", message.uuid);
             }

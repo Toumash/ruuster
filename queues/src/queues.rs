@@ -1,6 +1,6 @@
 use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
-use protos::{Message, Metadata};
 
+use internals::{Message, Metadata};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::acks::{AckContainer, ApplyAck};
 
@@ -154,7 +154,7 @@ impl RuusterQueues {
         &self,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
-        metadata: Option<&Metadata>,
+        metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), Status> {
         log::debug!(
             "binding queue: {} to exchange: {}",
@@ -213,7 +213,11 @@ impl RuusterQueues {
             let message = Message {
                 uuid: uuid.clone(),
                 payload,
-                metadata,
+                metadata: metadata.or(Some(Metadata {
+                    created_at: Some(Instant::now()),
+                    routing_key: None,
+                    dead_letter: None,
+                })),
             };
 
             exchange_read
@@ -293,7 +297,7 @@ impl RuusterQueues {
                 .lock()
                 .map_err(|e| {
                     RuusterQueues::log_status(
-                        &format!("failed to acuire queue lock: {}", e),
+                        &format!("failed to acquire queue lock: {}", e),
                         tonic::Code::Unavailable,
                     )
                 })?
@@ -302,17 +306,6 @@ impl RuusterQueues {
 
         match message {
             Some(msg) => {
-                match msg.metadata {
-                    Some(ref meta) => match &meta.ttl {
-                        Some(ttl) => {
-                            if ttl.value < 0 { // TODO: develop it further
-                                log::debug!("message dropped. ttl expired");
-                            }
-                        }
-                        None => {}
-                    },
-                    None => {}
-                }
                 // NOTICE(msaff): I'm not sure how to avoid clone of message object here and I'm open to suggestions
                 if !auto_ack {
                     RuusterQueues::track_message_delivery(
@@ -325,9 +318,9 @@ impl RuusterQueues {
                     "consuming single message from queue: {} completed",
                     queue_name
                 );
-                Ok(msg)
+                return Ok(msg);
             }
-            None => Err(Status::not_found("failed to return message")),
+            None => return Err(Status::not_found("failed to return message")),
         }
     }
 
@@ -335,7 +328,7 @@ impl RuusterQueues {
         &self,
         queue_name: &QueueName,
         auto_ack: bool,
-    ) -> ReceiverStream<Result<Message, Status>> {
+    ) -> ReceiverStream<Result<protos::Message, Status>> {
         log::debug!("spawning consuming task for queue: {}", queue_name);
         let (tx, rx) = mpsc::channel(4);
         let queues = self.queues.clone();
@@ -371,7 +364,10 @@ impl RuusterQueues {
                         );
                     }
 
-                    if let Err(e) = tx.send(Ok(message)).await {
+                    let msg = protos::Message  {
+                        ..Default::default()
+                    };
+                    if let Err(e) = tx.send(Ok(msg)).await {
                         let msg = format!("error while sending message to channel: {}", e);
                         log::error!("{}", msg);
                         return Status::internal(msg);
@@ -385,6 +381,7 @@ impl RuusterQueues {
                 }
             }
         });
+        
         ReceiverStream::new(rx)
     }
 

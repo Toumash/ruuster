@@ -14,6 +14,8 @@ To run you can use GitPod (super fast), devcontainers (local docker + vscode) or
 ```bash
 # to run the server
 cargo watch -x 'run --bin server'  --ignore protos/ #gitpod keeps regenerating proto files
+# to have watch on tests
+cargo watch -x 'test'  --ignore protos/ #gitpod keeps regenerating proto files
 
 # to run the client
 cargo run --bin client

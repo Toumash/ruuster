@@ -7,6 +7,6 @@ members = [
     "ruuster_grpc",
     "utils",
     "apps"
-]
+, "internals"]
 
 resolver = "2"

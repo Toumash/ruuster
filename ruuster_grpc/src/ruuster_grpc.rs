@@ -1,6 +1,6 @@
 use protos::{
     ruuster, AckRequest, ConsumeRequest, Empty, ExchangeDeclareRequest, ListExchangesResponse,
-    ListQueuesResponse, Message, ProduceRequest, QueueDeclareRequest,
+    ListQueuesResponse, ProduceRequest, QueueDeclareRequest, RoutingKey,
 };
 use protos::{AckMessageBulkRequest, BindRequest};
 use queues::queues::RuusterQueues;
@@ -77,7 +77,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
-    type ConsumeBulkStream = ReceiverStream<Result<Message, Status>>;
+    type ConsumeBulkStream = ReceiverStream<Result<protos::Message, Status>>;
 
     /**
      * receive messages from specific queue and return it in form of asynchronous stream
@@ -97,12 +97,25 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
     async fn consume_one(
         &self,
         request: tonic::Request<ConsumeRequest>,
-    ) -> Result<Response<Message>, Status> {
+    ) -> Result<Response<protos::Message>, Status> {
         let request = request.into_inner();
         let message = self
             .0
             .consume_message(&request.queue_name, request.auto_ack)?;
-        Ok(Response::new(message))
+        let msg = protos::Message {
+            metadata: match message.metadata {
+                Some(m) => match m.routing_key {
+                    Some(rk) => Some(protos::Metadata {
+                        routing_key: Some(RoutingKey { value: rk }),
+                    }),
+                    None => None,
+                },
+                None => None,
+            },
+            payload: message.payload,
+            uuid: message.uuid,
+        };
+        Ok(Response::new(msg))
     }
 
     async fn produce(
@@ -110,8 +123,15 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
+        let metadata = Some(internals::Metadata {
+            created_at: None,
+            dead_letter: None,
+            routing_key: request
+                .metadata
+                .map_or(None, |m| Some(m.routing_key.unwrap().value)),
+        });
         self.0
-            .forward_message(request.payload, &request.exchange_name, request.metadata)?;
+            .forward_message(request.payload, &request.exchange_name, metadata)?;
         Ok(Response::new(Empty {}))
     }
 

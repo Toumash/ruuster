@@ -28,7 +28,7 @@ impl Exchange for DirectExchange {
     fn bind(
         &mut self,
         queue_name: &QueueName,
-        metadata: Option<&Metadata>,
+        metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError> {
         let metadata = match metadata {
             Some(data) => data,
@@ -75,7 +75,7 @@ impl Exchange for DirectExchange {
         };
 
         let route_key = match &metadata.routing_key {
-            Some(key) => key.value.clone(),
+            Some(key) => key.clone(),
             None => return Err(ExchangeError::BindFail),
         };
 
@@ -116,7 +116,7 @@ mod tests {
 
     static ONCE: Once = Once::new();
 
-    use protos::RoutingKey;
+    use protos::{BindMetadata, RoutingKey};
     use uuid::Uuid;
 
     use super::*;
@@ -134,77 +134,79 @@ mod tests {
     #[test]
     fn bind_test() {
         let mut ex: DirectExchange = DirectExchange::default();
-        // let map = HashMap::from([
-        //     ("route_key".to_string(), "route_1".to_string())
-        // ]);
-        let metadata = Metadata {
+        let bind_metadata = BindMetadata {
             routing_key: Some(RoutingKey {
                 value: "route_1".to_string(),
             }),
-            ttl: None,
         };
-        assert_eq!(ex.bind(&"q1".to_string(), Some(&metadata)), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string(), Some(&metadata)), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string(), Some(&metadata)), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), Some(&bind_metadata)), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), Some(&bind_metadata)), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), Some(&bind_metadata)), Ok(()));
         assert_eq!(ex.get_bound_queue_names().len(), 3);
     }
 
     #[test]
     fn duplicate_queue_different_routing_bind_test() {
         let mut ex = DirectExchange::default();
-        // let map_first = HashMap::from([("route_key".to_string(), "test_1".to_string())]);
-        // let map_second = HashMap::from([("route_key".to_string(), "test_2".to_string())]);
-        let metadata_first = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test_1".to_string(),
-            }),
-            ttl: None,
-        };
-        let metadata_second = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test_2".to_string(),
-            }),
-            ttl: None,
-        };
-        assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
-        assert!(ex.bind(&"q1".to_string(), Some(&metadata_second)).is_ok());
+        assert!(ex
+            .bind(
+                &"q1".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            )
+            .is_ok());
+        assert!(ex
+            .bind(
+                &"q1".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_2".to_string()
+                    })
+                })
+            )
+            .is_ok());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
     }
 
     #[test]
     fn duplicate_queue_same_routing_bind_test() {
         let mut ex = DirectExchange::default();
-        // let map_first = HashMap::from([("route_key".to_string(), "test".to_string())]);
-        // let map_second = HashMap::from([("route_key".to_string(), "test".to_string())]);
-        let metadata_first = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test".to_string(),
+        let meta = protos::BindMetadata {
+            routing_key: Some(protos::RoutingKey {
+                value: "test_1".to_string(),
             }),
-            ttl: None,
         };
-        let metadata_second = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test".to_string(),
-            }),
-            ttl: None,
-        };
-        assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
-        assert!(ex.bind(&"q1".to_string(), Some(&metadata_second)).is_err());
+        assert!(ex.bind(&"q1".to_string(), Some(&meta)).is_ok());
+        assert!(ex.bind(&"q1".to_string(), Some(&meta)).is_err());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
     }
 
     #[test]
     fn different_queue_bind_test() {
         let mut ex = DirectExchange::default();
-        // let map_first = HashMap::from([("route_key".to_string(), "test".to_string())]);
-        let metadata_first = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test".to_string(),
-            }),
-            ttl: None,
-        };
-        assert!(ex.bind(&"q1".to_string(), Some(&metadata_first)).is_ok());
-        assert!(ex.bind(&"q2".to_string(), Some(&metadata_first)).is_ok());
+        assert!(ex
+            .bind(
+                &"q1".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            )
+            .is_ok());
+        assert!(ex
+            .bind(
+                &"q2".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            )
+            .is_ok());
         assert_eq!(ex.get_bound_queue_names().len(), 2);
     }
 
@@ -216,28 +218,59 @@ mod tests {
         let queues = setup_test_queues();
         let mut ex = DirectExchange::default();
 
-        let metadata_first = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test_1".to_string(),
-            }),
-            ttl: None,
-        };
-        let metadata_second = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "test_2".to_string(),
-            }),
-            ttl: None,
-        };
-
-        assert_eq!(ex.bind(&"q1".to_string(), Some(&metadata_first)), Ok(()));
-        assert_eq!(ex.bind(&"q1".to_string(), Some(&metadata_second)), Ok(()));
-        assert_eq!(ex.bind(&"q2".to_string(), Some(&metadata_first)), Ok(()));
-        assert_eq!(ex.bind(&"q3".to_string(), Some(&metadata_first)), Ok(()));
+        assert_eq!(
+            ex.bind(
+                &"q1".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            ex.bind(
+                &"q1".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_2".to_string()
+                    })
+                })
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            ex.bind(
+                &"q2".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            ex.bind(
+                &"q3".to_string(),
+                Some(&protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: "test_1".to_string()
+                    })
+                })
+            ),
+            Ok(())
+        );
 
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_first),
+            metadata: Some(Metadata {
+                routing_key: Some("test_1".to_string()),
+                created_at: None,
+                dead_letter: None,
+            }),
         };
 
         assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
@@ -246,7 +279,11 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_second),
+            metadata: Some(Metadata {
+                routing_key: Some("test_2".to_string()),
+                created_at: None,
+                dead_letter: None,
+            }),
         };
 
         assert_eq!(ex.handle_message(message, queues.clone()), Ok(1u32));
@@ -263,12 +300,18 @@ mod tests {
         drop(queues_write);
         let mut ex = DirectExchange::new("fanout_test".into());
         let routing_metadata = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "route_key".to_string(),
-            }),
-            ttl: None,
+            routing_key: Some("route_key".to_string()),
+            created_at: None,
+            dead_letter: None,
         };
-        let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
+        let _ = ex.bind(
+            &"q1".to_string(),
+            Some(&protos::BindMetadata {
+                routing_key: Some(RoutingKey {
+                    value: "route_key".to_string(),
+                }),
+            }),
+        );
 
         for _ in 1..=1000 {
             let _ = ex
@@ -314,13 +357,14 @@ mod tests {
         assert!(dead_letter_queue.is_none());
 
         let mut ex = DirectExchange::new("fanout_test".into());
-        let routing_metadata = Metadata {
-            routing_key: Some(RoutingKey {
-                value: "route_key".to_string(),
+        let _ = ex.bind(
+            &"q1".to_string(),
+            Some(&BindMetadata {
+                routing_key: Some(RoutingKey {
+                    value: "route_key".to_string(),
+                }),
             }),
-            ttl: None,
-        };
-        let _ = ex.bind(&"q1".to_string(), Some(&routing_metadata));
+        );
 
         // add the messages up to the limit
         for _ in 1..=1000 {
@@ -329,7 +373,11 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: Some(routing_metadata.clone()),
+                        metadata: Some(Metadata {
+                            created_at: None,
+                            dead_letter: None,
+                            routing_key: Some("route_key".to_string()),
+                        }),
                     },
                     queues.clone(),
                 )
@@ -339,7 +387,11 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(routing_metadata),
+            metadata: Some(Metadata {
+                created_at: None,
+                dead_letter: None,
+                routing_key: Some("route_key".to_string()),
+            }),
         };
 
         // act

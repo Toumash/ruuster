@@ -54,9 +54,15 @@ pub struct ExchangeDeclareRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct BindMetadata {
+    #[prost(message, optional, tag = "1")]
+    pub routing_key: ::core::option::Option<RoutingKey>,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BindRequest {
     #[prost(message, optional, tag = "1")]
-    pub metadata: ::core::option::Option<Metadata>,
+    pub metadata: ::core::option::Option<BindMetadata>,
     #[prost(string, tag = "2")]
     pub exchange_name: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]

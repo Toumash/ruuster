@@ -21,7 +21,11 @@ impl FanoutExchange {
 impl PushToQueueStrategy for FanoutExchange {}
 
 impl Exchange for FanoutExchange {
-    fn bind(&mut self, queue_name: &QueueName, _metadata: Option<&Metadata>) -> Result<(), ExchangeError> {
+    fn bind(
+        &mut self,
+        queue_name: &QueueName,
+        _metadata: Option<&protos::BindMetadata>,
+    ) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
             return Err(ExchangeError::BindFail);
         }
@@ -35,7 +39,7 @@ impl Exchange for FanoutExchange {
     fn handle_message(
         &self,
         message: Message,
-        queues: Arc<RwLock<QueueContainer>>
+        queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError> {
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
@@ -44,8 +48,13 @@ impl Exchange for FanoutExchange {
 
         for name in queues_names {
             if let Some(queue) = queues_read.get(&name) {
-                if self.push_to_queue(&self.exchange_name, message.clone(), queue, &name, &queues_read)?
-                    == PushResult::Ok
+                if self.push_to_queue(
+                    &self.exchange_name,
+                    message.clone(),
+                    queue,
+                    &name,
+                    &queues_read,
+                )? == PushResult::Ok
                 {
                     pushed_counter += 1;
                 }
@@ -109,7 +118,7 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: None
+            metadata: None,
         };
 
         assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
@@ -143,9 +152,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: None
+                        metadata: None,
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -153,7 +162,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: None
+            metadata: None,
         };
 
         // act
@@ -190,9 +199,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: None
+                        metadata: None,
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -200,7 +209,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: None
+            metadata: None,
         };
 
         // act
