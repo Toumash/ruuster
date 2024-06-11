@@ -9,6 +9,26 @@ edition = "2021"
 name = "server"
 path = "./src/server.rs"
 
+[[bin]]
+name = "run_scenario"
+path = "./src/test_client/src/run_scenario.rs"
+
+[[bin]]
+name = "producer"
+path = "./src/test_client/src/producer.rs"
+
+[[bin]]
+name = "consumer"
+path = "./src/test_client/src/consumer.rs"
+
+[[bin]]
+name = "scenario_validator"
+path = "./src/test_client/src/scenario_validator.rs"
+
+[[bin]]
+name = "scenario_builder"
+path = "./src/test_client/src/scenario_builder.rs"
+
 [dependencies]
 opentelemetry = { version = "0.23" }
 opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
@@ -20,13 +40,20 @@ tracing = "0.1.4"
 tracing-opentelemetry = "0.24"
 tracing-subscriber = "0.3"
 
-
 tonic = "0.11.0"
 tonic-reflection = "0.11.0"
 tokio = { version = "1.37.0", features = ["tokio-macros", "macros", "rt-multi-thread"] }
 tokio-stream = "0.1.15"
+
 uuid = { version = "1.8.0", features = ["v4"]}
+
+serde_json = "1.0.117"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_derive = "1.0.203"
+
 exchanges = { path = "../exchanges" }
 ruuster-grpc = { path = "../ruuster_grpc" }
 protos = { path = "../protos" }
 utils = { path = "../utils" }
+
+clap = { version = "4.5.6", features=["derive"]}

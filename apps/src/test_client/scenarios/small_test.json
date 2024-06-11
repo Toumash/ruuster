@@ -1,0 +1,61 @@
+{
+    "metadata": {
+        "name": "small_test",
+        "server_addr": "http://127.0.0.1:50051"
+    },
+    "queues": [
+        {
+            "name": "q0"
+        },
+        {
+            "name": "q1"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "e0",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "metadata": null
+                },
+                {
+                    "queue_name": "q1",
+                    "metadata": null
+                }
+            ]
+        }
+    ],
+    "producers": [
+        {
+            "name": "p0",
+            "destination": "e0",
+            "messages_produced": 10,
+            "message_payload_bytes": 100,
+            "post_message_delay_seconds": 1.0 
+        }
+    ],
+    "consumers": [
+        {
+            "name": "c0",
+            "source": "q0",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_seconds": {
+                "min": 0.1,
+                "max": 0.5
+            }
+        },
+        {
+            "name": "c1",
+            "source": "q1",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_seconds": {
+                "min": 0.1,
+                "max": 0.5
+            }
+        }
+    ]
+}
