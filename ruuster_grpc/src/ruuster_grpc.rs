@@ -8,7 +8,7 @@ use queues::queues::RuusterQueues;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
-use tracing::instrument;
+use tracing::{info_span, instrument, Instrument};
 
 pub struct RuusterQueuesGrpc(RuusterQueues);
 
@@ -93,11 +93,17 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Self::ConsumeBulkStream>, Status> {
         let request = request.into_inner();
+        let span = info_span!(
+            "consume_bulk",
+            queue_name=%request.queue_name,
+            auto_ack=%request.auto_ack
+        );
         let queue_name = &request.queue_name;
         let auto_ack = request.auto_ack;
-
-        let async_receiver = self.0.start_consuming_task(queue_name, auto_ack).await;
-        Ok(Response::new(async_receiver))
+        let result = async move { self.0.start_consuming_task(queue_name, auto_ack).await }
+            .instrument(span)
+            .await;
+        Ok(Response::new(result))
     }
 
     #[instrument(skip_all, fields(request=?request))]

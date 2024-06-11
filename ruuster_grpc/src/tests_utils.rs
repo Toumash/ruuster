@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
 
-use exchanges::{ExchangeName, ExchangeKind};
+use exchanges::{ExchangeKind, ExchangeName};
 use protos::ExchangeDefinition;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -23,7 +23,8 @@ static ONCE: Once = Once::new();
 
 async fn setup_server() -> SocketAddr {
     ONCE.call_once(|| {
-        env_logger::init();
+        let subscriber = tracing_subscriber::fmt().compact().finish();
+        tracing::subscriber::set_global_default(subscriber).expect("failed to setup test logs");
     });
 
     let listener = TcpListener::bind(TEST_SERVER_ADDR).await.unwrap();
@@ -124,7 +125,7 @@ pub async fn create_bindings(
             .bind(BindRequest {
                 exchange_name: exchange_name.to_string(),
                 queue_name: queue_name.to_string(),
-                metadata: None
+                metadata: None,
             })
             .await;
 
@@ -151,13 +152,12 @@ pub async fn produce_n_random_messages(
 ) -> Vec<String> {
     let mut result = vec![];
     for _ in 0..n {
-        let payload = generate_random_string(100);
-        println!("generated payload: {}", &payload);
+        let payload = generate_random_string(1000);
         result.push(payload.clone());
         let request = ProduceRequest {
             exchange_name: exchange_name.clone(),
             payload,
-            metadata: None
+            metadata: None,
         };
 
         let response = client.produce(request.clone()).await;
@@ -183,7 +183,6 @@ pub async fn consume_messages(
     payloads: &Vec<String>,
     should_fail: bool,
 ) {
-    println!("payload size: {}", payloads.len());
     let request = ConsumeRequest {
         queue_name: queue_name.clone(),
         auto_ack: true,
@@ -200,7 +199,6 @@ pub async fn consume_messages(
                 response.unwrap_err()
             );
             let consumed_payload = response.unwrap().into_inner().payload;
-            println!("consumed payload: {}", &consumed_payload);
             assert_eq!(consumed_payload, payload.to_owned());
         }
     }
@@ -210,11 +208,11 @@ pub async fn consume_and_ack_messages(
     client: &mut RuusterClient<Channel>,
     queue_name: QueueName,
     should_ack_fail: bool,
-    expected_message_count: u32
+    expected_message_count: u32,
 ) {
-    let request = ConsumeRequest { 
+    let request = ConsumeRequest {
         queue_name: queue_name.clone(),
-        auto_ack: false
+        auto_ack: false,
     };
     let mut idx = 0u32;
     loop {
@@ -225,18 +223,21 @@ pub async fn consume_and_ack_messages(
             return;
         }
         let consumed_uuid = response.unwrap().into_inner().uuid;
-            println!("consumed uuid: {}", &consumed_uuid);
-            let ack_request = AckRequest {
-                uuid: consumed_uuid.clone()
-            };
-            let ack_response = client.ack_message(ack_request).await;
+        let ack_request = AckRequest {
+            uuid: consumed_uuid.clone(),
+        };
+        let ack_response = client.ack_message(ack_request).await;
         if !should_ack_fail {
-            assert!(ack_response.is_ok(), "ack request for message {} failed: {}", &consumed_uuid, ack_response.unwrap_err());
-        }
-        else {
+            assert!(
+                ack_response.is_ok(),
+                "ack request for message {} failed: {}",
+                &consumed_uuid,
+                ack_response.unwrap_err()
+            );
+        } else {
             assert!(ack_response.is_err(), "ack request should fail");
         }
-        idx+=1;
+        idx += 1;
     }
 }
 

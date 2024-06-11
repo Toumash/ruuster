@@ -41,6 +41,7 @@ def get_metadata_label(metadata_json):
     <TR><TD>metadata</TD><TD></TD></TR>
     <TR><TD>name:</TD><TD>{metadata_json["name"]}</TD></TR>
     <TR><TD>server_addr:</TD><TD>{metadata_json["server_addr"]}</TD></TR>
+    <TR><TD>comment:</TD><TD>{metadata_json["comment"]}</TD></TR>
     <TR><TD>scenario path:</TD><TD>{sys.argv[1]}</TD></TR>
     </TABLE>>"""
 
@@ -73,7 +74,7 @@ def get_consumer_label(consumer_json):
     <TR><TD>name:</TD><TD>{consumer_json["name"]}</TD></TR>
     <TR><TD>consuming_method:</TD><TD>{consumer_json["consuming_method"]}</TD></TR>
     <TR><TD>ack_method:</TD><TD>{consumer_json["ack_method"]}</TD></TR>
-    <TR><TD>workload:</TD><TD>[{consumer_json["workload_seconds"]["min"]}, {consumer_json["workload_seconds"]["max"]}] [s]</TD></TR>
+    <TR><TD>workload:</TD><TD>[{consumer_json["workload_ms"]["min"]}, {consumer_json["workload_ms"]["max"]}] [ms]</TD></TR>
     </TABLE>>"""
 
 # Create a new directed graph
@@ -82,7 +83,7 @@ dot = Digraph(comment='scenario', format='png')
 dot.attr(ranksep='2.0')  # Apply global rank separation for all ranks
 dot.attr(nodesep='0.5') 
 
-dot.node("metadata",label=get_metadata_label(data["metadata"]), shape="box")
+dot.node("metadata",label=get_metadata_label(data["server_metadata"]), shape="box")
 
 # Add nodes and edges for producers and exchanges
 for producer in data['producers']:
@@ -96,7 +97,10 @@ with dot.subgraph() as sub:
         sub.node(exchange['name'], label=get_exchange_label(exchange), shape='box', color=color)
         # Add edges from exchanges to queues
         for bind in exchange['bindings']:
-            dot.edge(exchange['name'], bind["queue_name"], color=color)
+            if bind["bind_metadata"] is not None:
+                dot.edge(exchange['name'], bind["queue_name"], color=color, label=bind["bind_metadata"]["routing_key"])
+            else:
+                dot.edge(exchange['name'], bind["queue_name"], color=color)
 
 with dot.subgraph() as sub:
     sub.attr(rank='same')
@@ -109,5 +113,5 @@ with dot.subgraph() as sub:
         dot.node(consumer["name"], label=get_consumer_label(consumer), shape='box')
         dot.edge(consumer["source"], consumer["name"])
 
-# Render the graph to a file and display it
-dot.render(data["metadata"]["name"], cleanup=True)
+# Render the graph to a file
+dot.render(data["server_metadata"]["name"], cleanup=True)

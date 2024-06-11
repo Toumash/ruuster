@@ -61,6 +61,7 @@ impl RuusterQueues {
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
 
+        info!("queue added");
         Ok(())
     }
 
@@ -278,6 +279,7 @@ impl RuusterQueues {
         message: Message,
         duration: Duration,
     ) -> Result<(), Status> {
+        let _enter = tracing::info_span!("track_message_delivery").entered();
         info!("started tracking delivery");
         acks.add_record(message, duration);
         Ok(())
@@ -362,11 +364,16 @@ impl RuusterQueues {
                         if !auto_ack {
                             let mut acks = acks_arc.write().unwrap();
                             // TODO(msaff): add proper error handling
-                            let _ = RuusterQueues::track_message_delivery(
+                            match RuusterQueues::track_message_delivery(
                                 &mut acks,
                                 message.clone(),
                                 DEFAULT_ACK_DURATION,
-                            );
+                            ) {
+                                Ok(_) => {}
+                                Err(status) => {
+                                    error!(status=%status, "track message delivery failed");
+                                }
+                            }
                         }
 
                         let msg = protos::Message {
@@ -377,13 +384,15 @@ impl RuusterQueues {
                             error!(error=%e, "{}", msg);
                             return Status::internal(msg);
                         }
-                        info!("message correclty sent over channel");
+                        info!("message correctly sent over channel");
                     } else {
-                        tokio::task::yield_now().await;
+                        // tokio::task::yield_now().await;
+                        // NOTICE(msaff): yield_now().await re-add task as a pending task at the back of the pending queue
+                        //                resulting in 100% usage of 1 logical core, I added a temporary solution with sleep function
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
-            }
-            .instrument(span),
+            }.instrument(span)
         );
         ReceiverStream::new(rx)
     }
