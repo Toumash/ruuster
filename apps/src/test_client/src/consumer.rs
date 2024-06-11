@@ -30,11 +30,11 @@ struct Args {
     #[arg(short, long)]
     ack_method: AckMethod,
 
-    #[arg(short, long, default_value_t = 0.0f32)]
-    min_delay: f32,
+    #[arg(short, long, default_value_t = 0)]
+    min_delay_ms: i32,
 
-    #[arg(short, long, default_value_t = 0.0f32)]
-    max_delay: f32,
+    #[arg(short, long, default_value_t = 0)]
+    max_delay_ms: i32,
 }
 
 // 2 strategies - consume and ack, consume will call a chosen ack method based on a terminal parameter
@@ -64,12 +64,15 @@ impl AckMethodStrategy for AutoAckMethod {
 #[async_trait]
 trait ConsumingMethodStrategy<AckType: AckMethodStrategy + Send + Sync> {
     fn new(queue_name: String, ack: AckType) -> Self;
-    async fn consume(&self, client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>>;
+    async fn consume(
+        &self,
+        client: &mut RuusterClient<Channel>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 struct StramConsumingMethod<AckType: AckMethodStrategy + Send + Sync> {
     queue_name: String,
-    ack_method: AckType,
+    ack_method: AckType
 }
 
 #[async_trait]
@@ -82,7 +85,10 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
             ack_method,
         }
     }
-    async fn consume(&self, client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn consume(
+        &self,
+        client: &mut RuusterClient<Channel>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let request = ConsumeRequest {
             queue_name: self.queue_name.clone(),
             auto_ack: self.ack_method.is_auto(),
@@ -94,8 +100,9 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
             println!("Payload: {}", &message.payload);
 
             // simulate workload
-            // let waiting_time = utils::random_float(0.0f64, 1.0f64);
-
+            // let mut rng = rand::thread_rng();
+            // let workload_sec = rng.gen_range(self.workload_range_sec.0 ..= self.workload_range_sec.1);
+            // std::thread::sleep(Duration::from_millis((workload_sec * 1000) as u64));
 
             self.ack_method.acknowledge(&message.uuid).await?;
 
@@ -112,7 +119,9 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
 async fn run_consumer(args: Args, client: &mut RuusterClient<Channel>) {
     let consuming_method = match (args.ack_method, args.consuming_method) {
         (AckMethod::Auto, ConsumingMethod::Single) => todo!(),
-        (AckMethod::Auto, ConsumingMethod::Stream) => StramConsumingMethod::new(args.source, AutoAckMethod),
+        (AckMethod::Auto, ConsumingMethod::Stream) => {
+            StramConsumingMethod::new(args.source, AutoAckMethod)
+        }
         (AckMethod::Single, ConsumingMethod::Single) => todo!(),
         (AckMethod::Single, ConsumingMethod::Stream) => todo!(),
         (AckMethod::Bulk, ConsumingMethod::Single) => todo!(),
@@ -120,8 +129,8 @@ async fn run_consumer(args: Args, client: &mut RuusterClient<Channel>) {
     };
 
     match consuming_method.consume(client).await {
-        Ok(_) => println!("success"),
-        Err(e) => println!("error: {:#?}", e),
+        Ok(_) => println!("Success"),
+        Err(e) => println!("Error: {:#?}", e),
     }
 }
 
