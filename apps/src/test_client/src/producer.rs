@@ -33,10 +33,17 @@ async fn run_producer(args: Args, client: &mut RuusterClient<Channel>) -> Result
         };
         client.produce(request).await?;
 
-        std::thread::sleep(Duration::from_millis(args.delay_ms.try_into().unwrap()));
+        tokio::time::sleep(Duration::from_millis(args.delay_ms.try_into().unwrap())).await;
 
         messages_countdown -= 1;
     }
+    let stop_request = ProduceRequest {
+        payload: STOP_TOKEN.try_into().unwrap(),
+        metadata: None, 
+        exchange_name: args.destination
+    };
+    client.produce(stop_request).await?;
+    
     Ok(())
 }
 

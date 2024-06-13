@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use clap::{Parser, ValueEnum};
 use protos::{ruuster_client::RuusterClient, ConsumeRequest};
 use tonic::{async_trait, transport::Channel};
@@ -102,7 +104,7 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
             // simulate workload
             // let mut rng = rand::thread_rng();
             // let workload_sec = rng.gen_range(self.workload_range_sec.0 ..= self.workload_range_sec.1);
-            // std::thread::sleep(Duration::from_millis((workload_sec * 1000) as u64));
+            // tokio::time::sleep(Duration::from_millis(100)).await;
 
             self.ack_method.acknowledge(&message.uuid).await?;
 
@@ -116,7 +118,7 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
     }
 }
 
-async fn run_consumer(args: Args, client: &mut RuusterClient<Channel>) {
+async fn run_consumer(args: Args, client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>> {
     let consuming_method = match (args.ack_method, args.consuming_method) {
         (AckMethod::Auto, ConsumingMethod::Single) => todo!(),
         (AckMethod::Auto, ConsumingMethod::Stream) => {
@@ -128,10 +130,9 @@ async fn run_consumer(args: Args, client: &mut RuusterClient<Channel>) {
         (AckMethod::Bulk, ConsumingMethod::Stream) => todo!(),
     };
 
-    match consuming_method.consume(client).await {
-        Ok(_) => println!("Success"),
-        Err(e) => println!("Error: {:#?}", e),
-    }
+    consuming_method.consume(client).await?;
+       
+    Ok(())
 }
 
 #[tokio::main]
