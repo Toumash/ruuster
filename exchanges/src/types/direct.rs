@@ -1,6 +1,6 @@
-use tracing::info;
 use std::collections::hash_map::Entry;
 use std::collections::HashSet;
+use tracing::info;
 
 use crate::*;
 
@@ -93,8 +93,13 @@ impl Exchange for DirectExchange {
 
         for name in bound_queues {
             if let Some(queue) = queues_read.get(name) {
-                if self.push_to_queue(&self.exchange_name, message.clone(), queue, name, &queues_read)?
-                    == PushResult::Ok
+                if self.push_to_queue(
+                    &self.exchange_name,
+                    message.clone(),
+                    queue,
+                    name,
+                    &queues_read,
+                )? == PushResult::Ok
                 {
                     pushed_counter += 1;
                 }
@@ -204,7 +209,7 @@ mod tests {
         });
         let queues = setup_test_queues();
         let mut ex = DirectExchange::default();
-        
+
         let metadata_first = Metadata {
             routing_key: Some(RoutingKey {
                 value: "test_1".to_string(),
@@ -224,7 +229,7 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_first)
+            metadata: Some(metadata_first),
         };
 
         assert_eq!(ex.handle_message(message.clone(), queues.clone()), Ok(3u32));
@@ -233,7 +238,7 @@ mod tests {
         let message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(metadata_second)
+            metadata: Some(metadata_second),
         };
 
         assert_eq!(ex.handle_message(message, queues.clone()), Ok(1u32));
@@ -262,9 +267,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: Some(routing_metadata.clone())
+                        metadata: Some(routing_metadata.clone()),
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -272,7 +277,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(routing_metadata)
+            metadata: Some(routing_metadata),
         };
 
         // act
@@ -314,9 +319,9 @@ mod tests {
                     Message {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
-                        metadata: Some(routing_metadata.clone())
+                        metadata: Some(routing_metadata.clone()),
                     },
-                    queues.clone()
+                    queues.clone(),
                 )
                 .unwrap();
         }
@@ -324,7 +329,7 @@ mod tests {
         let one_too_many_message = Message {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
-            metadata: Some(routing_metadata)
+            metadata: Some(routing_metadata),
         };
 
         // act

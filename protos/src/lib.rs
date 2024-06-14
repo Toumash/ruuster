@@ -3,14 +3,14 @@ pub mod ruuster {
 }
 pub use ruuster::*;
 
-use std::fmt::Display;
 use std::fmt;
+use std::fmt::Display;
 
 impl Display for Metadata {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.routing_key {
             Some(rk) => write!(f, "{}", rk.value),
-            None => write!(f, "None")
+            None => write!(f, "None"),
         }
     }
 }

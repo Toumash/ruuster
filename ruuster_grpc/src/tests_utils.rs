@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Once;
 use std::time::Duration;
 
-use exchanges::{ExchangeName, ExchangeKind};
+use exchanges::{ExchangeKind, ExchangeName};
 use protos::ExchangeDefinition;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -124,7 +124,7 @@ pub async fn create_bindings(
             .bind(BindRequest {
                 exchange_name: exchange_name.to_string(),
                 queue_name: queue_name.to_string(),
-                metadata: None
+                metadata: None,
             })
             .await;
 
@@ -156,7 +156,7 @@ pub async fn produce_n_random_messages(
         let request = ProduceRequest {
             exchange_name: exchange_name.clone(),
             payload,
-            metadata: None
+            metadata: None,
         };
 
         let response = client.produce(request.clone()).await;
@@ -207,11 +207,11 @@ pub async fn consume_and_ack_messages(
     client: &mut RuusterClient<Channel>,
     queue_name: QueueName,
     should_ack_fail: bool,
-    expected_message_count: u32
+    expected_message_count: u32,
 ) {
-    let request = ConsumeRequest { 
+    let request = ConsumeRequest {
         queue_name: queue_name.clone(),
-        auto_ack: false
+        auto_ack: false,
     };
     let mut idx = 0u32;
     loop {
@@ -222,17 +222,21 @@ pub async fn consume_and_ack_messages(
             return;
         }
         let consumed_uuid = response.unwrap().into_inner().uuid;
-            let ack_request = AckRequest {
-                uuid: consumed_uuid.clone()
-            };
-            let ack_response = client.ack_message(ack_request).await;
+        let ack_request = AckRequest {
+            uuid: consumed_uuid.clone(),
+        };
+        let ack_response = client.ack_message(ack_request).await;
         if !should_ack_fail {
-            assert!(ack_response.is_ok(), "ack request for message {} failed: {}", &consumed_uuid, ack_response.unwrap_err());
-        }
-        else {
+            assert!(
+                ack_response.is_ok(),
+                "ack request for message {} failed: {}",
+                &consumed_uuid,
+                ack_response.unwrap_err()
+            );
+        } else {
             assert!(ack_response.is_err(), "ack request should fail");
         }
-        idx+=1;
+        idx += 1;
     }
 }
 

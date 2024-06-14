@@ -1,6 +1,6 @@
 {
     "metadata": {
-        "name": "scenario1",
+        "name": "big-boy",
         "server_addr": "http://127.0.0.1:50051"
     },
     "queues": [
@@ -135,14 +135,14 @@
             "destination": "e0",
             "messages_produced": 10000,
             "message_payload_bytes": 10000,
-            "post_message_delay_seconds": 0.1 
+            "post_message_delay_ms": 10
         },
         {
             "name": "p1",
             "destination": "e1",
             "messages_produced": 10000,
             "message_payload_bytes": 10000,
-            "post_message_delay_seconds": 0.1 
+            "post_message_delay_ms": 10 
         }
     ],
     "consumers": [
@@ -151,9 +151,9 @@
             "source": "q0",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -161,9 +161,9 @@
             "source": "q1",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -171,9 +171,9 @@
             "source": "q2",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -181,9 +181,9 @@
             "source": "q3",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -191,9 +191,9 @@
             "source": "q4",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -201,9 +201,9 @@
             "source": "q5",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -211,9 +211,9 @@
             "source": "q6",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -221,9 +221,9 @@
             "source": "q7",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -231,9 +231,9 @@
             "source": "q8",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         },
         {
@@ -241,9 +241,9 @@
             "source": "q9",
             "consuming_method": "stream",
             "ack_method": "auto",
-            "workload_seconds": {
-                "min": 0.1,
-                "max": 0.5
+            "workload_ms": {
+                "min": 100,
+                "max": 500
             }
         }
     ]

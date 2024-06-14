@@ -46,6 +46,8 @@ tokio = { version = "1.37.0", features = ["tokio-macros", "macros", "rt-multi-th
 tokio-stream = "0.1.15"
 
 uuid = { version = "1.8.0", features = ["v4"]}
+rand = "0.8.5"
+thiserror = "1.0.61"
 
 serde_json = "1.0.117"
 serde = { version = "1.0.203", features = ["derive"] }

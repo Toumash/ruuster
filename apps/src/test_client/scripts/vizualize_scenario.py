@@ -73,7 +73,7 @@ def get_consumer_label(consumer_json):
     <TR><TD>name:</TD><TD>{consumer_json["name"]}</TD></TR>
     <TR><TD>consuming_method:</TD><TD>{consumer_json["consuming_method"]}</TD></TR>
     <TR><TD>ack_method:</TD><TD>{consumer_json["ack_method"]}</TD></TR>
-    <TR><TD>workload:</TD><TD>[{consumer_json["workload_seconds"]["min"]}, {consumer_json["workload_seconds"]["max"]}] [s]</TD></TR>
+    <TR><TD>workload:</TD><TD>[{consumer_json["workload_ms"]["min"]}, {consumer_json["workload_ms"]["max"]}] [ms]</TD></TR>
     </TABLE>>"""
 
 # Create a new directed graph

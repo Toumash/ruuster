@@ -7,29 +7,31 @@ use tonic::transport::Channel;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(long)]
     server_addr: String,
-    #[arg(short, long)]
+    #[arg(long)]
     destination: String,
-    #[arg(short, long)]
+    #[arg(long)]
     messages_produced: i32,
-    #[arg(short, long)]
+    #[arg(long)]
     message_payload_bytes: i32,
-    #[arg(short, long)]
+    #[arg(long)]
     delay_ms: i32,
 }
 
 const STOP_TOKEN: &str = "STOP";
 
-async fn run_producer(args: Args, client: &mut RuusterClient<Channel>) -> Result<(), Box<dyn std::error::Error>>
-{
+async fn run_producer(
+    args: Args,
+    client: &mut RuusterClient<Channel>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut messages_countdown = args.messages_produced;
 
     while messages_countdown >= 0 {
         let request = ProduceRequest {
             payload: utils::generate_random_string(args.message_payload_bytes.try_into().unwrap()),
             exchange_name: args.destination.clone(),
-            metadata: None //TODO: add support for direct exchange
+            metadata: None, //TODO: add support for direct exchange
         };
         client.produce(request).await?;
 
@@ -39,11 +41,11 @@ async fn run_producer(args: Args, client: &mut RuusterClient<Channel>) -> Result
     }
     let stop_request = ProduceRequest {
         payload: STOP_TOKEN.try_into().unwrap(),
-        metadata: None, 
-        exchange_name: args.destination
+        metadata: None,
+        exchange_name: args.destination,
     };
     client.produce(stop_request).await?;
-    
+
     Ok(())
 }
 

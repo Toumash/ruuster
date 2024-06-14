@@ -336,46 +336,51 @@ impl RuusterQueues {
             info!("spawning consuming task");
         });
 
-        tokio::spawn(async move {
-            loop {
-                let message: Option<Message> = {
-                    let queues_read = queues.read().unwrap();
+        tokio::spawn(
+            async move {
+                loop {
+                    let message: Option<Message> = {
+                        let queues_read = queues.read().unwrap();
 
-                    let requested_queue = match queues_read.get(&queue_name) {
-                        Some(queue) => queue,
-                        None => {
-                            let msg = "requested queue doesn't exist";
-                            error!("{}", msg);
-                            return Status::not_found(msg);
-                        }
+                        let requested_queue = match queues_read.get(&queue_name) {
+                            Some(queue) => queue,
+                            None => {
+                                let msg = "requested queue doesn't exist";
+                                error!("{}", msg);
+                                return Status::not_found(msg);
+                            }
+                        };
+
+                        let mut queue = requested_queue.lock().unwrap();
+                        queue.pop_front()
                     };
 
-                    let mut queue = requested_queue.lock().unwrap();
-                    queue.pop_front()
-                };
+                    if let Some(message) = message {
+                        if !auto_ack {
+                            let mut acks = acks_arc.write().unwrap();
+                            // TODO(msaff): add proper error handling
+                            let _ = RuusterQueues::track_message_delivery(
+                                &mut acks,
+                                message.clone(),
+                                DEFAULT_ACK_DURATION,
+                            );
+                        }
 
-                if let Some(message) = message {
-                    if !auto_ack {
-                        let mut acks = acks_arc.write().unwrap();
-                        // TODO(msaff): add proper error handling
-                        let _ = RuusterQueues::track_message_delivery(
-                            &mut acks,
-                            message.clone(),
-                            DEFAULT_ACK_DURATION,
-                        );
+                        if let Err(e) = tx.send(Ok(message)).await {
+                            let msg = format!("error while sending message to channel");
+                            error!(error=%e, "{}", msg);
+                            return Status::internal(msg);
+                        }
+                        info!("message correclty sent over channel");
+                    } else {
+                        // tokio::task::yield_now().await;
+                        // NOTICE(msaff): yield_now().await re-add task as a pending task at the back of the pending queue
+                        //                resulting in 100% usage of 1 logical core, I added a temporary solution with sleep function
+                        tokio::time::sleep(Duration::from_millis(100)).await;
                     }
-
-                    if let Err(e) = tx.send(Ok(message)).await {
-                        let msg = format!("error while sending message to channel");
-                        error!(error=%e, "{}", msg);
-                        return Status::internal(msg);
-                    }
-                    info!("message correclty sent over channel");
-                } else {
-                    tokio::task::yield_now().await;
                 }
             }
-        }.instrument(span)
+            .instrument(span),
         );
         ReceiverStream::new(rx)
     }

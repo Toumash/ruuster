@@ -26,10 +26,12 @@ fn validate_path(config_file_path: &Path) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-pub(crate) fn get_conf(config_file_path : &Path) -> Result<ScenarioConfig, Box<dyn std::error::Error>> {
+pub(crate) fn get_conf(
+    config_file_path: &Path,
+) -> Result<ScenarioConfig, Box<dyn std::error::Error>> {
     validate_path(config_file_path)?;
     let file = File::open(config_file_path)?;
     let reader = BufReader::new(file);
-    let scenario_config : ScenarioConfig = serde_json::from_reader(reader)?;
+    let scenario_config: ScenarioConfig = serde_json::from_reader(reader)?;
     Ok(scenario_config)
 }

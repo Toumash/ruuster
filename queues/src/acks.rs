@@ -143,8 +143,8 @@ impl AckRecord {
 /// assert!(acks.apply_ack(&"teepot2".to_string()).is_ok()); // lets ack second msg
 /// assert!(acks.clear_unused_record(&"teepot2".to_string()).is_ok());
 /// assert_eq!(acks.len(), 0);
-/// 
-/// 
+///
+///
 /// let msg1 = Message { uuid : "teepot".to_string(), payload: "#badcaffe".to_string(), metadata: None};
 /// let msg2 = Message { uuid : "teepot2".to_string(), payload: "#badcaffe".to_string(), metadata: None};
 /// acks.add_record(msg1.clone(), Duration::from_millis(100));
@@ -153,7 +153,7 @@ impl AckRecord {
 /// assert!(acks.apply_bulk_ack(&["teepot".to_string(),"teepot2".to_string()]).is_ok());
 /// assert!(acks.clear_all_unused_records().is_ok());
 /// assert_eq!(acks.len(), 0, "lipa ale wiadomo gdzie");
-/// 
+///
 /// ```
 
 pub trait ApplyAck {

@@ -67,7 +67,11 @@ impl fmt::Display for ExchangeError {
 }
 
 pub trait Exchange {
-    fn bind(&mut self, queue_name: &QueueName, metadata: Option<&Metadata>) -> Result<(), ExchangeError>;
+    fn bind(
+        &mut self,
+        queue_name: &QueueName,
+        metadata: Option<&Metadata>,
+    ) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
     fn handle_message(
         &self,
@@ -149,7 +153,10 @@ pub(crate) trait PushToQueueStrategy {
             warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                 // FIXME: use the deadletter queue defined per exchange
-                debug!("moving the message {} to the dead letter queue", message.uuid);
+                debug!(
+                    "moving the message {} to the dead letter queue",
+                    message.uuid
+                );
 
                 // FIXME: convert to ruuster headers
                 let val = json!({
@@ -168,7 +175,7 @@ pub(crate) trait PushToQueueStrategy {
                     .push_back(Message {
                         uuid: message.uuid,
                         payload: val,
-                        metadata: None
+                        metadata: None,
                     });
             } else {
                 debug!("message {} dropped", message.uuid);

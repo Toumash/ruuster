@@ -41,7 +41,7 @@ pub struct Producer {
     pub destination: String,
     pub messages_produced: i32,
     pub message_payload_bytes: i32,
-    pub post_message_delay_seconds: f32
+    pub post_message_delay_ms: f32,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,11 +50,11 @@ pub struct Consumer {
     pub source: String,
     pub consuming_method: String,
     pub ack_method: String,
-    pub workload_seconds: WorkloadSeconds,
+    pub workload_ms: WorkloadSeconds,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct WorkloadSeconds {
-    pub min: f32,
-    pub max: f32,
+    pub min: i32,
+    pub max: i32,
 }
