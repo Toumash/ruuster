@@ -121,14 +121,14 @@ impl ProcessManager {
        5. wait for consumers and producers to finish
     */
     fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
-        let scenario_builder = self.prepare_builder_command()?;
-        println!("running scenario-builder: {}", &scenario_builder);
-        let mut scenario_builder_command = Command::new(scenario_builder);
+        let command_str = self.prepare_builder_command()?;
+        let parts: Vec<&str> = command_str.split_whitespace().collect();
+        let mut child = Command::new(parts[0])
+            .args(&parts[1..])
+            .spawn()
+            .expect("failed to execute process");
 
-        
-        let mut aaa = scenario_builder_command.current_dir(std::env::current_dir().unwrap()).spawn()?;
-
-        aaa.wait()?;
+        child.wait()?;
 
         Ok(())
     }
