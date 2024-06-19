@@ -1,2 +1,0 @@
-#!/bin/bash
-./target/debug/run_scenario --server-addr 127.0.0.1 --config-file ./apps/src/test_client/scenarios/small_test.json --builder-bin ./target/debug/scenario_builder --consumer-bin /target/debug/consumer --producer-bin /target/debug/producer

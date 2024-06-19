@@ -41,7 +41,7 @@ pub struct Producer {
     pub destination: String,
     pub messages_produced: i32,
     pub message_payload_bytes: i32,
-    pub post_message_delay_ms: f32,
+    pub post_message_delay_ms: i32,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

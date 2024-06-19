@@ -26,7 +26,7 @@ async fn run_producer(
     client: &mut RuusterClient<Channel>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut messages_countdown = args.messages_produced;
-
+    println!("Producing messages...");
     while messages_countdown >= 0 {
         let request = ProduceRequest {
             payload: utils::generate_random_string(args.message_payload_bytes.try_into().unwrap()),
@@ -39,6 +39,8 @@ async fn run_producer(
 
         messages_countdown -= 1;
     }
+
+    println!("Producing STOP message");
     let stop_request = ProduceRequest {
         payload: STOP_TOKEN.try_into().unwrap(),
         metadata: None,
@@ -59,5 +61,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     run_producer(args, &mut client).await?;
 
+    println!("Exiting producer");
     Ok(())
 }

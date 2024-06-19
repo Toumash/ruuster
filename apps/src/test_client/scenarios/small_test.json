@@ -31,8 +31,8 @@
         {
             "name": "p0",
             "destination": "e0",
-            "messages_produced": 100,
-            "message_payload_bytes": 1000,
+            "messages_produced": 5,
+            "message_payload_bytes": 100,
             "post_message_delay_ms": 100
         }
     ],

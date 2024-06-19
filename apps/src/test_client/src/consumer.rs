@@ -109,6 +109,7 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
                 let mut rng = rand::thread_rng();
                 rng.gen_range(delay.0..=delay.1) as u64
             };
+            println!("consumed payload {:.20}...", &message.payload);
             tokio::time::sleep(Duration::from_millis(workload_ms)).await;
 
             self.ack_method.acknowledge(&message.uuid).await?;
@@ -118,7 +119,7 @@ impl<AckType: AckMethodStrategy + Send + Sync + 'static> ConsumingMethodStrategy
                 break;
             }
         }
-
+        println!("End of consuming");
         Ok(())
     }
 }
@@ -146,7 +147,6 @@ async fn run_consumer(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
-
     let mut client = RuusterClient::connect(args.server_addr.clone())
         .await
         .expect("failed to create consumer client");
