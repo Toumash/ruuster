@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::{fmt, path::Path};
 
-use crate::conf_json_def::ScenarioConfig;
+use crate::config_definition::ScenarioConfig;
 
 #[derive(Debug)]
 enum ArgsValidationError {
@@ -26,9 +26,7 @@ fn validate_path(config_file_path: &Path) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-pub fn get_conf(
-    config_file_path: &Path,
-) -> Result<ScenarioConfig, Box<dyn std::error::Error>> {
+pub fn get_conf(config_file_path: &Path) -> Result<ScenarioConfig, Box<dyn std::error::Error>> {
     validate_path(config_file_path)?;
     let file = File::open(config_file_path)?;
     let reader = BufReader::new(file);

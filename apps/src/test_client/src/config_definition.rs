@@ -46,7 +46,7 @@ pub struct Producer {
     pub messages_produced: i32,
     pub message_payload_bytes: i32,
     pub post_message_delay_ms: i32,
-    pub metadata: Metadata,
+    pub metadata: Option<Metadata>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -111,9 +111,9 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         );
         let queue_name = &request.queue_name;
         let auto_ack = request.auto_ack;
-        let result = async move {
-            self.0.start_consuming_task(queue_name, auto_ack).await
-        }.instrument(span).await;
+        let result = async move { self.0.start_consuming_task(queue_name, auto_ack).await }
+            .instrument(span)
+            .await;
         Ok(Response::new(result))
     }
 

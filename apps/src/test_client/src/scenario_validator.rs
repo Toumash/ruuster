@@ -1,12 +1,12 @@
-use std::str::FromStr;
 use clap::Parser;
+use std::str::FromStr;
 
-mod conf_json_def;
 mod conf_parser;
+mod config_definition;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-struct Args{
+struct Args {
     #[arg(long)]
     config_file: std::path::PathBuf,
 }

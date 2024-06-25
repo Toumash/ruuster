@@ -1,12 +1,12 @@
 use std::fmt::Display;
 
 use clap::Parser;
-use conf_json_def::ScenarioConfig;
+use config_definition::ScenarioConfig;
 use std::process::{Child, Command};
 use thiserror::Error;
 
-mod conf_json_def;
 mod conf_parser;
+mod config_definition;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -140,13 +140,14 @@ impl ProcessManager {
     }
 
     fn create_producer_children(&self) -> Result<Vec<Child>, Box<dyn std::error::Error>> {
-        let mut result : Vec<Child> = vec![];
+        let mut result: Vec<Child> = vec![];
         for producer in &self.config.producers {
             let producer_command = self.prepare_producer_command(
                 &producer.destination,
-                producer.messages_produced, 
-                producer.message_payload_bytes, 
-                producer.post_message_delay_ms)?;
+                producer.messages_produced,
+                producer.message_payload_bytes,
+                producer.post_message_delay_ms,
+            )?;
 
             let parts: Vec<&str> = producer_command.split_whitespace().collect();
             let child = Command::new(parts[0]).args(&parts[1..]).spawn()?;
@@ -157,14 +158,15 @@ impl ProcessManager {
     }
 
     fn wait_for_children(children: Vec<Child>) -> Result<Vec<()>, std::io::Error> {
-        children.into_iter().map(
-            |mut child| child.wait().map(|_| ())
-        ).collect()
+        children
+            .into_iter()
+            .map(|mut child| child.wait().map(|_| ()))
+            .collect()
     }
 
     /*
        1. run scenario builder process,
-       2. wait for it to finish 
+       2. wait for it to finish
        3. run consumers processes
        4. run producers processes
        5. wait for consumers and producers to finish

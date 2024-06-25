@@ -1,0 +1,188 @@
+// scenario
+digraph {
+	ranksep=2.0
+	nodesep=0.5
+	metadata [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>metadata</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>big-boy</TD></TR>
+    <TR><TD>server_addr:</TD><TD>http://127.0.0.1:50051</TD></TR>
+    <TR><TD>scenario path:</TD><TD>/home/marcins/rust_ws/ruuster/apps/src/test_client/scenarios/big_boy.json</TD></TR>
+    </TABLE>> shape=box]
+	p0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>producer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>p0</TD></TR>
+    <TR><TD>destination:</TD><TD>e0</TD></TR>
+    <TR><TD>messages_produced:</TD><TD>10000</TD></TR>
+    <TR><TD>messages_payload_bytes:</TD><TD>10000</TD></TR>
+    </TABLE>> shape=box]
+	p0 -> e0
+	p1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>producer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>p1</TD></TR>
+    <TR><TD>destination:</TD><TD>e1</TD></TR>
+    <TR><TD>messages_produced:</TD><TD>10000</TD></TR>
+    <TR><TD>messages_payload_bytes:</TD><TD>10000</TD></TR>
+    </TABLE>> shape=box]
+	p1 -> e1
+	e0 -> q0 [color="#a8a800"]
+	e0 -> q1 [color="#a8a800"]
+	e0 -> q2 [color="#a8a800"]
+	e0 -> q3 [color="#a8a800"]
+	e0 -> q4 [color="#a8a800"]
+	e0 -> q5 [color="#a8a800"]
+	e0 -> q6 [color="#a8a800"]
+	e0 -> q7 [color="#a8a800"]
+	e0 -> q8 [color="#a8a800"]
+	e0 -> q9 [color="#a8a800"]
+	e1 -> q0 [color="#0303ff"]
+	e1 -> q1 [color="#0303ff"]
+	e1 -> q2 [color="#0303ff"]
+	e1 -> q3 [color="#0303ff"]
+	e1 -> q4 [color="#0303ff"]
+	e1 -> q5 [color="#0303ff"]
+	e1 -> q6 [color="#0303ff"]
+	e1 -> q7 [color="#0303ff"]
+	e1 -> q8 [color="#0303ff"]
+	e1 -> q9 [color="#0303ff"]
+	{
+		rank=same
+		e0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>exchange</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>e0</TD></TR>
+    <TR><TD>kind:</TD><TD>Fanout</TD></TR>
+    <TR><TD>num of bindings:</TD><TD>10</TD></TR>
+    </TABLE>> color="#a8a800" shape=box]
+		e1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>exchange</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>e1</TD></TR>
+    <TR><TD>kind:</TD><TD>Fanout</TD></TR>
+    <TR><TD>num of bindings:</TD><TD>10</TD></TR>
+    </TABLE>> color="#0303ff" shape=box]
+	}
+	q0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q0</TD></TR>
+    </TABLE>> shape=box]
+	q1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q1</TD></TR>
+    </TABLE>> shape=box]
+	q2 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q2</TD></TR>
+    </TABLE>> shape=box]
+	q3 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q3</TD></TR>
+    </TABLE>> shape=box]
+	q4 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q4</TD></TR>
+    </TABLE>> shape=box]
+	q5 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q5</TD></TR>
+    </TABLE>> shape=box]
+	q6 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q6</TD></TR>
+    </TABLE>> shape=box]
+	q7 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q7</TD></TR>
+    </TABLE>> shape=box]
+	q8 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q8</TD></TR>
+    </TABLE>> shape=box]
+	q9 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q9</TD></TR>
+    </TABLE>> shape=box]
+	{
+		rank=same
+	}
+	c0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c0</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q0 -> c0
+	c1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c1</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q1 -> c1
+	c2 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c2</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q2 -> c2
+	c3 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c3</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q3 -> c3
+	c4 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c4</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q4 -> c4
+	c5 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c5</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q5 -> c5
+	c6 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c6</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q6 -> c6
+	c7 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c7</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q7 -> c7
+	c8 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c8</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q8 -> c8
+	c9 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c9</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q9 -> c9
+	{
+		rank=same
+	}
+}

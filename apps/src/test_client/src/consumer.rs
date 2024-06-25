@@ -51,7 +51,7 @@ const BULK_ACK_AMOUNT: usize = 20;
 #[derive(PartialEq)]
 enum AckMode {
     NORMAL,
-    FORCE
+    FORCE,
 }
 
 #[async_trait]
@@ -60,11 +60,10 @@ trait AckMethodStrategy {
         &mut self,
         client: &mut RuusterClient<Channel>,
         uuid: &UuidSerialized,
-        mode: AckMode
+        mode: AckMode,
     ) -> Result<(), Box<dyn std::error::Error>>;
     fn is_auto(&self) -> bool;
 }
-
 
 #[derive(Default)]
 struct AutoAckMethod;
@@ -75,7 +74,7 @@ impl AckMethodStrategy for AutoAckMethod {
         &mut self,
         _client: &mut RuusterClient<Channel>,
         _uuid: &UuidSerialized,
-        _ack_mode: AckMode
+        _ack_mode: AckMode,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
@@ -84,7 +83,6 @@ impl AckMethodStrategy for AutoAckMethod {
         true
     }
 }
-
 
 #[derive(Default)]
 struct SingleAckMethod;
@@ -95,7 +93,7 @@ impl AckMethodStrategy for SingleAckMethod {
         &mut self,
         client: &mut RuusterClient<Channel>,
         uuid: &UuidSerialized,
-        _mode: AckMode
+        _mode: AckMode,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let request = AckRequest {
             uuid: uuid.to_owned(),
@@ -122,7 +120,7 @@ impl AckMethodStrategy for BulkAckMethod {
         &mut self,
         client: &mut RuusterClient<Channel>,
         uuid: &UuidSerialized,
-        mode: AckMode
+        mode: AckMode,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if mode == AckMode::FORCE {
             let request = AckMessageBulkRequest {
@@ -198,11 +196,15 @@ impl ConsumingMethodStrategy for StreamConsumingMethod {
             tokio::time::sleep(Duration::from_millis(workload_ms)).await;
             // println!("Consumed payload {:.20}...", &message.payload);
 
-            self.ack_method.acknowledge(client, &message.uuid, AckMode::NORMAL).await?;
+            self.ack_method
+                .acknowledge(client, &message.uuid, AckMode::NORMAL)
+                .await?;
 
             if message.payload == STOP_TOKEN {
                 println!("Received stop token");
-                self.ack_method.acknowledge(client, &message.uuid, AckMode::FORCE).await?;
+                self.ack_method
+                    .acknowledge(client, &message.uuid, AckMode::FORCE)
+                    .await?;
                 break;
             }
         }
@@ -249,14 +251,17 @@ impl ConsumingMethodStrategy for SingleConsumingMethod {
             };
             tokio::time::sleep(Duration::from_millis(workload_ms)).await;
 
-
             if message.payload == STOP_TOKEN {
                 println!("Received stop token");
-                self.ack_method.acknowledge(client, &message.uuid, AckMode::FORCE).await?;
+                self.ack_method
+                    .acknowledge(client, &message.uuid, AckMode::FORCE)
+                    .await?;
                 break;
             }
 
-            self.ack_method.acknowledge(client, &message.uuid, AckMode::NORMAL).await?;
+            self.ack_method
+                .acknowledge(client, &message.uuid, AckMode::NORMAL)
+                .await?;
         }
         Ok(())
     }
@@ -282,7 +287,7 @@ async fn run_consumer(
             )),
             (AckMethod::Single, ConsumingMethod::Stream) => Box::new(StreamConsumingMethod::new(
                 args.source.clone(),
-                Box::new(SingleAckMethod::default())
+                Box::new(SingleAckMethod::default()),
             )),
             (AckMethod::Bulk, ConsumingMethod::Single) => Box::new(SingleConsumingMethod::new(
                 args.source.clone(),
@@ -290,7 +295,7 @@ async fn run_consumer(
             )),
             (AckMethod::Bulk, ConsumingMethod::Stream) => Box::new(StreamConsumingMethod::new(
                 args.source.clone(),
-                Box::new(BulkAckMethod::default())
+                Box::new(BulkAckMethod::default()),
             )),
         };
 

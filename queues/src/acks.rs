@@ -65,7 +65,6 @@ impl AckRecord {
         self.get_deadline() <= Instant::now()
     }
 
-
     #[instrument(skip_all)]
     pub fn apply_ack(&mut self) -> Result<(), AckStatus> {
         if self.is_deadline_exceeded() {

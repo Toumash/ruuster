@@ -38,10 +38,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let filter_layer = filter::Targets::new().with_targets([
         ("ruuster_grpc", LevelFilter::INFO),
         ("queues", LevelFilter::INFO),
-        ("exchanges", LevelFilter::INFO)
+        ("exchanges", LevelFilter::INFO),
     ]);
-    let stdout_log = tracing_subscriber::fmt::layer()
-        .pretty();
+    let stdout_log = tracing_subscriber::fmt::layer().pretty();
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
     let subscriber = Registry::default()
         .with(telemetry)

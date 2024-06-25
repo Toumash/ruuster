@@ -1,13 +1,13 @@
 use clap::Parser;
-use conf_json_def::ScenarioConfig;
+use config_definition::ScenarioConfig;
 use protos::{
     ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition,
     QueueDeclareRequest,
 };
 use tonic::transport::Channel;
 
-mod conf_json_def;
 mod conf_parser;
+mod config_definition;
 
 struct ScenarioBuilder {
     config: ScenarioConfig,
