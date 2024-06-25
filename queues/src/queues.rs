@@ -275,6 +275,7 @@ impl RuusterQueues {
         message: Message,
         duration: Duration,
     ) -> Result<(), Status> {
+        let _enter = tracing::info_span!("track_message_delivery").entered();
         info!("started tracking delivery");
         acks.add_record(message, duration);
         Ok(())
@@ -332,7 +333,7 @@ impl RuusterQueues {
             queue_name=%queue_name,
             auto_ack=%auto_ack
         );
-        let _ = span.in_scope(|| {
+        span.in_scope(|| {
             info!("spawning consuming task");
         });
 
@@ -359,19 +360,23 @@ impl RuusterQueues {
                         if !auto_ack {
                             let mut acks = acks_arc.write().unwrap();
                             // TODO(msaff): add proper error handling
-                            let _ = RuusterQueues::track_message_delivery(
+                            match RuusterQueues::track_message_delivery(
                                 &mut acks,
                                 message.clone(),
                                 DEFAULT_ACK_DURATION,
-                            );
+                            ) {
+                                Ok(_) => {}
+                                Err(status) => {
+                                    error!(status=%status, "track message delivery failed");
+                                }
+                            }
                         }
 
-                        if let Err(e) = tx.send(Ok(message)).await {
-                            let msg = format!("error while sending message to channel");
-                            error!(error=%e, "{}", msg);
-                            return Status::internal(msg);
+                        if let Err(e) = tx.send(Ok(message.clone())).await {
+                            error!(error=%e, payload=%message.payload, "error while sending message to channel");
+                            return Status::internal("error while sending message to channel");
                         }
-                        info!("message correclty sent over channel");
+                        info!("message correctly sent over channel");
                     } else {
                         // tokio::task::yield_now().await;
                         // NOTICE(msaff): yield_now().await re-add task as a pending task at the back of the pending queue
@@ -379,8 +384,7 @@ impl RuusterQueues {
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
-            }
-            .instrument(span),
+            }.instrument(span)
         );
         ReceiverStream::new(rx)
     }

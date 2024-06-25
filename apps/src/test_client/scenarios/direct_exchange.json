@@ -1,6 +1,6 @@
 {
     "server_metadata": {
-        "name": "small_test",
+        "name": "direct_exchange",
         "server_addr": "http://127.0.0.1:50051"
     },
     "queues": [
@@ -18,22 +18,33 @@
             "bindings": [
                 {
                     "queue_name": "q0",
-                    "metadata": null
+                    "bind_metadata": null
                 },
                 {
                     "queue_name": "q1",
-                    "metadata": null
+                    "bind_metadata": {
+                        "routing_key": "black"
+                    }
+                },
+                {
+                    "queue_name": "q1",
+                    "bind_metadata": {
+                        "routing_key": "green"
+                    }
                 }
             ]
         }
     ],
     "producers": [
         {
-            "name": "p0",
+            "name": "orange-producer",
             "destination": "e0",
             "messages_produced": 5,
             "message_payload_bytes": 100,
-            "post_message_delay_ms": 100
+            "post_message_delay_ms": 100,
+            "metadata": {
+                "routing_key": "orange"
+            }
         }
     ],
     "consumers": [

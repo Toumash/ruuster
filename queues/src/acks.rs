@@ -6,7 +6,7 @@ use std::{
 use protos::Message;
 use tonic::Status;
 
-use tracing::{self as log, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 type UuidSerialized = String;
 
@@ -18,13 +18,6 @@ pub struct AckRecord {
     timestamp: Instant,
     duration: Duration,
 }
-
-// TODO (msaff): LATER
-// used for sorting Acks by
-// pub struct AckNode {
-//     deadline: Instant,
-//     message: Arc<Message>
-// }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AckStatus {
@@ -72,17 +65,19 @@ impl AckRecord {
         self.get_deadline() <= Instant::now()
     }
 
+
+    #[instrument(skip_all)]
     pub fn apply_ack(&mut self) -> Result<(), AckStatus> {
         if self.is_deadline_exceeded() {
-            log::info!("deadline exceeded for message: {}", self.get_message().uuid);
+            info!("deadline exceeded for message");
             return Err(AckStatus::DeadlineExceeded);
         }
         if self.counter <= 0 {
-            log::info!("message {} already acked", self.get_message().uuid);
+            info!("message {} already acked", self.get_message().uuid);
             return Err(AckStatus::MessageAlreadyAcked);
         }
 
-        log::debug!("message acked: {}", self.message.uuid);
+        debug!("message acked: {}", self.message.uuid);
         self.counter -= 1;
         Ok(())
     }
@@ -165,7 +160,7 @@ pub trait ApplyAck {
 }
 
 impl ApplyAck for AckContainer {
-    #[instrument(skip_all, fields(uuid=%uuid))]
+    #[instrument(skip_all, fields(uuid = % uuid))]
     fn clear_unused_record(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get(uuid) {
             if record.get_counter() <= 0 {
@@ -178,7 +173,7 @@ impl ApplyAck for AckContainer {
         Err(Status::not_found("ack record not found"))
     }
 
-    #[instrument(skip_all, fields(uuid=%message.uuid, duartion=?duration))]
+    #[instrument(skip_all, fields(uuid = % message.uuid, duartion = ? duration))]
     fn add_record(&mut self, message: Message, duration: Duration) {
         let uuid = message.uuid.to_owned();
         info!("adding ack record");
@@ -190,7 +185,7 @@ impl ApplyAck for AckContainer {
             .or_insert(AckRecord::new(message, Instant::now(), duration));
     }
 
-    #[instrument(skip_all, fields(uuid=%uuid))]
+    #[instrument(skip_all, fields(uuid = % uuid))]
     fn apply_ack(&mut self, uuid: &UuidSerialized) -> Result<(), Status> {
         if let Some(record) = self.get_mut(uuid) {
             record.apply_ack().map_err(|e| {
@@ -204,10 +199,11 @@ impl ApplyAck for AckContainer {
         Err(Status::not_found("ack record not found"))
     }
 
-    #[instrument(skip_all, fields(uuids=?uuids))]
+    #[instrument(skip_all, fields(uuids = ? uuids))]
     fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status> {
         for item in uuids {
-            self.apply_ack(item)?;
+            // note (msaff): we can safely ignore errors from apply_ack - we want to continue to ack messages from array
+            let _ = self.apply_ack(item);
         }
         Ok(())
     }

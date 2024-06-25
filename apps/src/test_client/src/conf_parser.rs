@@ -26,7 +26,7 @@ fn validate_path(config_file_path: &Path) -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-pub(crate) fn get_conf(
+pub fn get_conf(
     config_file_path: &Path,
 ) -> Result<ScenarioConfig, Box<dyn std::error::Error>> {
     validate_path(config_file_path)?;

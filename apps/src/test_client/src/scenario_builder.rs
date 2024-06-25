@@ -17,16 +17,16 @@ struct ScenarioBuilder {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(long)]
     server_addr: String,
 
-    #[arg(short, long)]
+    #[arg(long)]
     config_file: std::path::PathBuf,
 }
 
 impl ScenarioBuilder {
     async fn new(config: ScenarioConfig) -> Self {
-        let client = RuusterClient::connect(config.metadata.server_addr.clone())
+        let client = RuusterClient::connect(config.server_metadata.server_addr.clone())
             .await
             .expect("failed to create ruuster client");
         ScenarioBuilder { config, client }

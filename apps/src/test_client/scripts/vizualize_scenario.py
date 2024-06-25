@@ -110,4 +110,4 @@ with dot.subgraph() as sub:
         dot.edge(consumer["source"], consumer["name"])
 
 # Render the graph to a file and display it
-dot.render(data["metadata"]["name"], cleanup=True)
+dot.render(data["metadata"]["name"])

@@ -28,13 +28,13 @@ async fn run_producer(
     let mut messages_countdown = args.messages_produced;
     println!("Producing messages...");
     while messages_countdown >= 0 {
+        let payload = messages_countdown.to_string() + " " + &*utils::generate_random_string(args.message_payload_bytes.try_into().unwrap());
         let request = ProduceRequest {
-            payload: utils::generate_random_string(args.message_payload_bytes.try_into().unwrap()),
+            payload,
             exchange_name: args.destination.clone(),
             metadata: None, //TODO: add support for direct exchange
         };
         client.produce(request).await?;
-
         tokio::time::sleep(Duration::from_millis(args.delay_ms.try_into().unwrap())).await;
 
         messages_countdown -= 1;

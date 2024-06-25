@@ -1,5 +1,5 @@
 {
-    "metadata": {
+    "server_metadata": {
         "name": "big-boy",
         "server_addr": "http://127.0.0.1:50051"
     },

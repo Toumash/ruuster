@@ -8,7 +8,7 @@ use queues::queues::RuusterQueues;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Response;
 use tonic::Status;
-use tracing::instrument;
+use tracing::{info_span, instrument, Instrument};
 
 pub struct RuusterQueuesGrpc(RuusterQueues);
 
@@ -47,6 +47,24 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         Ok(Response::new(Empty {}))
     }
 
+    #[instrument(skip_all, fields(request=?request))]
+    async fn bind(
+        &self,
+        request: tonic::Request<BindRequest>,
+    ) -> Result<tonic::Response<Empty>, tonic::Status> {
+        let request: BindRequest = request.into_inner();
+
+        // check if requested queue and exchange exists
+        let _ = self.0.get_queue(&request.queue_name)?;
+        let _ = self.0.get_exchange(&request.exchange_name)?;
+
+        let metadata = request.metadata.as_ref();
+
+        self.0
+            .bind_queue_to_exchange(&request.queue_name, &request.exchange_name, metadata)?;
+        Ok(Response::new(Empty {}))
+    }
+
     #[instrument(skip_all)]
     async fn list_queues(
         &self,
@@ -66,20 +84,13 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
     }
 
     #[instrument(skip_all, fields(request=?request))]
-    async fn bind(
+    async fn produce(
         &self,
-        request: tonic::Request<BindRequest>,
-    ) -> Result<tonic::Response<Empty>, tonic::Status> {
-        let request: BindRequest = request.into_inner();
-
-        // check if requested queue and exchange exists
-        let _ = self.0.get_queue(&request.queue_name)?;
-        let _ = self.0.get_exchange(&request.exchange_name)?;
-
-        let metadata = request.metadata.as_ref();
-
+        request: tonic::Request<ProduceRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
         self.0
-            .bind_queue_to_exchange(&request.queue_name, &request.exchange_name, metadata)?;
+            .forward_message(request.payload, &request.exchange_name, request.metadata)?;
         Ok(Response::new(Empty {}))
     }
 
@@ -93,11 +104,17 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         request: tonic::Request<ConsumeRequest>,
     ) -> Result<Response<Self::ConsumeBulkStream>, Status> {
         let request = request.into_inner();
+        let span = info_span!(
+            "consume_bulk",
+            queue_name=%request.queue_name,
+            auto_ack=%request.auto_ack
+        );
         let queue_name = &request.queue_name;
         let auto_ack = request.auto_ack;
-
-        let async_receiver = self.0.start_consuming_task(queue_name, auto_ack).await;
-        Ok(Response::new(async_receiver))
+        let result = async move {
+            self.0.start_consuming_task(queue_name, auto_ack).await
+        }.instrument(span).await;
+        Ok(Response::new(result))
     }
 
     #[instrument(skip_all, fields(request=?request))]
@@ -110,17 +127,6 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
             .0
             .consume_message(&request.queue_name, request.auto_ack)?;
         Ok(Response::new(message))
-    }
-
-    #[instrument(skip_all, fields(request=?request))]
-    async fn produce(
-        &self,
-        request: tonic::Request<ProduceRequest>,
-    ) -> Result<Response<Empty>, Status> {
-        let request = request.into_inner();
-        self.0
-            .forward_message(request.payload, &request.exchange_name, request.metadata)?;
-        Ok(Response::new(Empty {}))
     }
 
     #[instrument(skip_all)]

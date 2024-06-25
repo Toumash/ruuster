@@ -1,10 +1,9 @@
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-use serde_json::Value;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScenarioConfig {
-    pub metadata: Metadata,
+    pub server_metadata: ServerMetadata,
     pub queues: Vec<Queue>,
     pub exchanges: Vec<Exchange>,
     pub producers: Vec<Producer>,
@@ -12,7 +11,7 @@ pub struct ScenarioConfig {
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Metadata {
+pub struct ServerMetadata {
     pub name: String,
     pub server_addr: String,
 }
@@ -32,7 +31,12 @@ pub struct Exchange {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Binding {
     pub queue_name: String,
-    pub metadata: Value,
+    pub bind_metadata: Option<BindMetadata>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BindMetadata {
+    pub routing_key: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -42,6 +46,12 @@ pub struct Producer {
     pub messages_produced: i32,
     pub message_payload_bytes: i32,
     pub post_message_delay_ms: i32,
+    pub metadata: Metadata,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Metadata {
+    pub routing_key: String,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -50,11 +60,11 @@ pub struct Consumer {
     pub source: String,
     pub consuming_method: String,
     pub ack_method: String,
-    pub workload_ms: WorkloadSeconds,
+    pub workload_ms: WorkloadMs,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct WorkloadSeconds {
+pub struct WorkloadMs {
     pub min: i32,
     pub max: i32,
 }
