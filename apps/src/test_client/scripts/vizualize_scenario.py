@@ -82,7 +82,7 @@ dot = Digraph(comment='scenario', format='png')
 dot.attr(ranksep='2.0')  # Apply global rank separation for all ranks
 dot.attr(nodesep='0.5') 
 
-dot.node("metadata",label=get_metadata_label(data["metadata"]), shape="box")
+dot.node("metadata",label=get_metadata_label(data["server_metadata"]), shape="box")
 
 # Add nodes and edges for producers and exchanges
 for producer in data['producers']:
@@ -96,7 +96,10 @@ with dot.subgraph() as sub:
         sub.node(exchange['name'], label=get_exchange_label(exchange), shape='box', color=color)
         # Add edges from exchanges to queues
         for bind in exchange['bindings']:
-            dot.edge(exchange['name'], bind["queue_name"], color=color)
+            if bind["bind_metadata"] is not None:
+                dot.edge(exchange['name'], bind["queue_name"], color=color, label=bind["bind_metadata"]["routing_key"])
+            else:
+                dot.edge(exchange['name'], bind["queue_name"], color=color)
 
 with dot.subgraph() as sub:
     sub.attr(rank='same')
@@ -110,4 +113,4 @@ with dot.subgraph() as sub:
         dot.edge(consumer["source"], consumer["name"])
 
 # Render the graph to a file and display it
-dot.render(data["metadata"]["name"])
+dot.render(data["server_metadata"]["name"])

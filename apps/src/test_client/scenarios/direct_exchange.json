@@ -14,22 +14,24 @@
     "exchanges": [
         {
             "name": "e0",
-            "kind": 0,
+            "kind": 1,
             "bindings": [
                 {
                     "queue_name": "q0",
-                    "bind_metadata": null
-                },
-                {
-                    "queue_name": "q1",
                     "bind_metadata": {
-                        "routing_key": "black"
+                        "routing_key": "key1"
                     }
                 },
                 {
                     "queue_name": "q1",
                     "bind_metadata": {
-                        "routing_key": "green"
+                        "routing_key": "key2"
+                    }
+                },
+                {
+                    "queue_name": "q1",
+                    "bind_metadata": {
+                        "routing_key": "key3"
                     }
                 }
             ]

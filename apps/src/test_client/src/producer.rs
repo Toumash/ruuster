@@ -21,19 +21,20 @@ struct Args {
     #[arg(long)]
     delay_ms: i32,
     #[arg(long)]
-    metadata: Option<Metadata>,
+    metadata: Option<String>,
 }
 
 const STOP_TOKEN: &str = "STOP";
 
-fn parse_metadata(config_metadata: &Option<Metadata>) -> Option<protos::Metadata> {
+fn parse_metadata(config_metadata: &Option<String>) -> Option<protos::Metadata> {
     match config_metadata {
         None => None,
-        Some(meta) => Some(protos::Metadata {
-            routing_key: Some(RoutingKey {
-                value: meta.routing_key.clone(),
-            }),
-        }),
+        Some(meta) => {
+            let meta_parsed: Metadata = serde_json::from_str(meta).expect("failed to parse metadata argument");
+            Some(protos::Metadata {
+                routing_key: Some(RoutingKey{ value: meta_parsed.routing_key.clone()})
+            })
+        },
     }
 }
 

@@ -1,0 +1,61 @@
+// scenario
+digraph {
+	ranksep=2.0
+	nodesep=0.5
+	metadata [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>metadata</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>direct_exchange</TD></TR>
+    <TR><TD>server_addr:</TD><TD>http://127.0.0.1:50051</TD></TR>
+    <TR><TD>scenario path:</TD><TD>/home/marcins/rust_ws/ruuster/apps/src/test_client/scenarios/direct_exchange.json</TD></TR>
+    </TABLE>> shape=box]
+	"orange-producer" [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>producer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>orange-producer</TD></TR>
+    <TR><TD>destination:</TD><TD>e0</TD></TR>
+    <TR><TD>messages_produced:</TD><TD>5</TD></TR>
+    <TR><TD>messages_payload_bytes:</TD><TD>100</TD></TR>
+    </TABLE>> shape=box]
+	"orange-producer" -> e0
+	e0 -> q0 [label=orange color="#c100c1"]
+	e0 -> q1 [label=black color="#c100c1"]
+	e0 -> q1 [label=green color="#c100c1"]
+	{
+		rank=same
+		e0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>exchange</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>e0</TD></TR>
+    <TR><TD>kind:</TD><TD>Direct</TD></TR>
+    <TR><TD>num of bindings:</TD><TD>3</TD></TR>
+    </TABLE>> color="#c100c1" shape=box]
+	}
+	q0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q0</TD></TR>
+    </TABLE>> shape=box]
+	q1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>queue</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>q1</TD></TR>
+    </TABLE>> shape=box]
+	{
+		rank=same
+	}
+	c0 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c0</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q0 -> c0
+	c1 [label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0">
+    <TR><TD>consumer</TD><TD></TD></TR>
+    <TR><TD>name:</TD><TD>c1</TD></TR>
+    <TR><TD>consuming_method:</TD><TD>stream</TD></TR>
+    <TR><TD>ack_method:</TD><TD>auto</TD></TR>
+    <TR><TD>workload:</TD><TD>[100, 500] [ms]</TD></TR>
+    </TABLE>> shape=box]
+	q1 -> c1
+	{
+		rank=same
+	}
+}
