@@ -6,6 +6,7 @@ use std::time::Instant;
 use internals::{DeadLetterMetadata, Message, Metadata};
 use serde::{Deserialize, Serialize};
 
+use tracing::{debug, error, info, warn};
 use types::{DirectExchange, FanoutExchange};
 
 pub mod types;
@@ -138,8 +139,8 @@ pub(crate) trait PushToQueueStrategy {
         if queue_lock.len() >= QUEUE_MAX_LENGTH {
             warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
-                // FIXME: use the deadletter queue defined per exchange
-                log::debug!(
+                // TODO: use the deadletter queue defined per exchange
+                debug!(
                     "moving the message {} to the dead letter queue",
                     message.uuid
                 );
@@ -166,7 +167,7 @@ pub(crate) trait PushToQueueStrategy {
                     .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
                     .push_back(message);
             } else {
-                debug!("message {} dropped", message.uuid);
+                info!("message {} dropped", message.uuid);
             }
             return Ok(PushResult::QueueOverflow);
         } else {
