@@ -4,7 +4,7 @@ use internals::{Message, Metadata};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
-use tracing::{self, error, info, info_span, instrument, warn, Instrument};
+use tracing::{self, debug, error, info, info_span, instrument, warn, Instrument};
 use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
@@ -61,7 +61,6 @@ impl RuusterQueues {
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
 
-        log::debug!("queue: {} added", &queue_name);
         Ok(())
     }
 
@@ -161,7 +160,7 @@ impl RuusterQueues {
                 "bind_queue_to_exchange",
                 queue_name = %queue_name,
                 exchange_name=%exchange_name,
-                metadata=%md
+                metadata=?md
             )
             .entered(),
             None => info_span!(
@@ -199,7 +198,7 @@ impl RuusterQueues {
                 "forward_message",
                 uuid = %uuid_str,
                 exchange_name=%exchange_name,
-                metadata=%md
+                metadata=?md
             )
             .entered(),
             None => info_span!(
@@ -220,7 +219,7 @@ impl RuusterQueues {
             })?;
 
             let message = Message {
-                uuid: uuid.clone(),
+                uuid: uuid_str.clone(),
                 payload,
                 metadata: metadata.or(Some(Metadata {
                     created_at: Some(Instant::now()),
