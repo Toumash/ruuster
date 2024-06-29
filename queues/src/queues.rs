@@ -4,7 +4,7 @@ use internals::{Message, Metadata};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
-use tracing::{self, debug, error, info, info_span, instrument, warn, Instrument};
+use tracing::{self, error, info, info_span, instrument, warn, Instrument};
 use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};

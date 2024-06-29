@@ -10,17 +10,9 @@ pub struct RoutingKey {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct TimeToLive {
-    #[prost(int64, tag = "1")]
-    pub value: i64,
-}
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Metadata {
     #[prost(message, optional, tag = "1")]
     pub routing_key: ::core::option::Option<RoutingKey>,
-    #[prost(message, optional, tag = "2")]
-    pub ttl: ::core::option::Option<TimeToLive>,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

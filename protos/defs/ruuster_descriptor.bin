@@ -1,17 +1,13 @@
 
-Ñ
+†
 ruuster.protoruuster"
 Empty""
 
 RoutingKey
-value (	Rvalue""
-
-TimeToLive
-value (Rvalue"g
+value (	Rvalue"@
 Metadata4
 routing_key (2.ruuster.RoutingKeyR
-routingKey%
-ttl (2.ruuster.TimeToLiveRttl"f
+routingKey"f
 Message
 uuid (	Ruuid
 payload (	Rpayload-
