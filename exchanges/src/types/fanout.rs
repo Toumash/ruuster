@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use tracing::{info, instrument, Span};
+
 use crate::*;
 
 #[derive(Default)]
@@ -36,11 +38,16 @@ impl Exchange for FanoutExchange {
         self.bound_queues.clone()
     }
 
+    #[instrument(skip_all, fields(uuid = %message.uuid))]
     fn handle_message(
         &self,
         message: Message,
         queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError> {
+        let _span = Span::current().entered();
+
+        info!("handling message started");
+
         let queues_names = self.get_bound_queue_names();
         let queues_read = queues.read().unwrap();
 
@@ -58,8 +65,11 @@ impl Exchange for FanoutExchange {
                 {
                     pushed_counter += 1;
                 }
+                info!(queue_name=%name, "message pushed");
             }
         }
+
+        info!("handling message finished");
 
         Ok(pushed_counter)
     }

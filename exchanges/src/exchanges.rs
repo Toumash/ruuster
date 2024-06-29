@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt;
+use std::fmt::{self, Display};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -87,7 +87,7 @@ impl From<i32> for ExchangeKind {
             0 => ExchangeKind::Fanout,
             1 => ExchangeKind::Direct,
             wrong_value => {
-                log::error!(
+                error!(
                     "value {} is not correct ExchangeKind, will use Fanout",
                     wrong_value
                 );
@@ -102,6 +102,15 @@ impl From<ExchangeKind> for i32 {
         match value {
             ExchangeKind::Fanout => 0,
             ExchangeKind::Direct => 1,
+        }
+    }
+}
+
+impl Display for ExchangeKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            ExchangeKind::Fanout => write!(f, "{}", "ExchangeKind::Fanout"),
+            ExchangeKind::Direct => write!(f, "{}", "ExchangeKind::Direct"),
         }
     }
 }
@@ -127,7 +136,7 @@ pub(crate) trait PushToQueueStrategy {
     ) -> Result<PushResult, ExchangeError> {
         let queue_lock = &mut queue.lock().unwrap();
         if queue_lock.len() >= QUEUE_MAX_LENGTH {
-            log::warn!("queue size reached for queue {}", name);
+            warn!("queue size reached for queue {}", name);
             if let Some(dead_letter_queue) = queues_read.get(DEADLETTER_QUEUE_NAME) {
                 // FIXME: use the deadletter queue defined per exchange
                 log::debug!(
@@ -157,7 +166,7 @@ pub(crate) trait PushToQueueStrategy {
                     .map_err(|_| ExchangeError::DeadLetterQueueLockFail {})?
                     .push_back(message);
             } else {
-                log::debug!("message {} dropped", message.uuid);
+                debug!("message {} dropped", message.uuid);
             }
             return Ok(PushResult::QueueOverflow);
         } else {

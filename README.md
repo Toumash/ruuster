@@ -17,12 +17,11 @@ cargo watch -x 'run --bin server'  --ignore protos/ #gitpod keeps regenerating p
 # to have watch on tests
 cargo watch -x 'test'  --ignore protos/ #gitpod keeps regenerating proto files
 
-# to run the client
-cargo run --bin client
+```bash
+# to run docker for local tracing and metrics
+docker run -d -p6831:6831/udp -p6832:6832/udp -p16686:16686 -p14268:14268 -p4317:4317 jaegertracing/all-in-one:latest
 
-
-# to run with a specified log level
-RUST_LOG=debug cargo run --bin client
+# then enter http://localhost:16686 to open Jaeger UI
 ```
 ---
 # Ruuster workspace

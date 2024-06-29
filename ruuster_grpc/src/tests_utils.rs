@@ -152,7 +152,7 @@ pub async fn produce_n_random_messages(
     let mut result = vec![];
     for _ in 0..n {
         let payload = generate_random_string(100);
-        log::info!("generated payload: {}", &payload);
+        println!("generated payload: {}", &payload);
         result.push(payload.clone());
         let request = ProduceRequest {
             exchange_name: exchange_name.clone(),
@@ -183,7 +183,7 @@ pub async fn consume_messages(
     payloads: &Vec<String>,
     should_fail: bool,
 ) {
-    log::info!("payload size: {}", payloads.len());
+    println!("payload size: {}", payloads.len());
     let request = ConsumeRequest {
         queue_name: queue_name.clone(),
         auto_ack: true,
@@ -200,7 +200,7 @@ pub async fn consume_messages(
                 response.unwrap_err()
             );
             let consumed_payload = response.unwrap().into_inner().payload;
-            log::info!("consumed payload: {}", &consumed_payload);
+            println!("consumed payload: {}", &consumed_payload);
             assert_eq!(consumed_payload, payload.to_owned());
         }
     }
@@ -225,7 +225,7 @@ pub async fn consume_and_ack_messages(
             return;
         }
         let consumed_uuid = response.unwrap().into_inner().uuid;
-            log::info!("consumed uuid: {}", &consumed_uuid);
+            println!("consumed uuid: {}", &consumed_uuid);
             let ack_request = AckRequest {
                 uuid: consumed_uuid.clone()
             };
