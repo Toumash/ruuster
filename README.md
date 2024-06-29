@@ -4,15 +4,18 @@
 
 # Setup
 
+To run you can use GitPod (super fast), devcontainers (local docker + vscode) or just linux box
+
 1. Clone the repo
 1. Open in vscode
-1. In vscode run command "reopen in devcontainer"
+1. Run `docker compose up -d` to start logs/traces collector UI: http://localhost:16686
 1. Build & run in the terminal
 
-```rs
-// to run the server
-cargo run --bin server --release'
-```
+```bash
+# to run the server
+cargo watch -x 'run --bin server'  --ignore protos/ #gitpod keeps regenerating proto files
+# to have watch on tests
+cargo watch -x 'test'  --ignore protos/ #gitpod keeps regenerating proto files
 
 ```bash
 # to run docker for local tracing and metrics

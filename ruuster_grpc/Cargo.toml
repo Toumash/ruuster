@@ -21,6 +21,7 @@ exchanges = { path = "../exchanges" }
 queues = { path = "../queues" }
 protos = { path = "../protos" }
 utils = { path = "../utils" }
+internals =  { path = "../internals" }
 
 [dev-dependencies]
 lazy_static = "1.4.0"

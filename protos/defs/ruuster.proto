@@ -43,8 +43,12 @@ message ExchangeDeclareRequest {
     ExchangeDefinition exchange = 1;
 }
 
+message BindMetadata {
+     RoutingKey routing_key = 1;
+}
+
 message BindRequest {
-    Metadata metadata = 1;
+    BindMetadata metadata = 1;
     string exchange_name = 2;
     string queue_name = 3;
 }

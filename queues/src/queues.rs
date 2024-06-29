@@ -1,6 +1,6 @@
 use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
-use protos::{Message, Metadata};
 
+use internals::{Message, Metadata};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::acks::{AckContainer, ApplyAck};
 
@@ -61,7 +61,6 @@ impl RuusterQueues {
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
 
-        info!("queue added");
         Ok(())
     }
 
@@ -154,14 +153,14 @@ impl RuusterQueues {
         &self,
         queue_name: &QueueName,
         exchange_name: &ExchangeName,
-        metadata: Option<&Metadata>,
+        metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), Status> {
         let _span = match &metadata {
             Some(md) => info_span!(
                 "bind_queue_to_exchange",
                 queue_name = %queue_name,
                 exchange_name=%exchange_name,
-                metadata=%md
+                metadata=?md
             )
             .entered(),
             None => info_span!(
@@ -199,7 +198,7 @@ impl RuusterQueues {
                 "forward_message",
                 uuid = %uuid_str,
                 exchange_name=%exchange_name,
-                metadata=%md
+                metadata=?md
             )
             .entered(),
             None => info_span!(
@@ -222,7 +221,11 @@ impl RuusterQueues {
             let message = Message {
                 uuid: uuid_str.clone(),
                 payload,
-                metadata,
+                metadata: metadata.or(Some(Metadata {
+                    created_at: Some(Instant::now()),
+                    routing_key: None,
+                    dead_letter: None,
+                })),
             };
 
             exchange_read
@@ -313,7 +316,7 @@ impl RuusterQueues {
                 info!(uuid = &msg.uuid, "consuming single message completed");
                 Ok(msg)
             }
-            None => Err(Status::not_found("failed to return message")),
+            None => return Err(Status::not_found("failed to return message")),
         }
     }
 
@@ -321,7 +324,7 @@ impl RuusterQueues {
         &self,
         queue_name: &QueueName,
         auto_ack: bool,
-    ) -> ReceiverStream<Result<Message, Status>> {
+    ) -> ReceiverStream<Result<protos::Message, Status>> {
         let (tx, rx) = mpsc::channel(4);
         let queues = self.queues.clone();
         let queue_name = queue_name.clone();
@@ -336,46 +339,51 @@ impl RuusterQueues {
             info!("spawning consuming task");
         });
 
-        tokio::spawn(async move {
-            loop {
-                let message: Option<Message> = {
-                    let queues_read = queues.read().unwrap();
+        tokio::spawn(
+            async move {
+                loop {
+                    let message: Option<Message> = {
+                        let queues_read = queues.read().unwrap();
 
-                    let requested_queue = match queues_read.get(&queue_name) {
-                        Some(queue) => queue,
-                        None => {
-                            let msg = "requested queue doesn't exist";
-                            error!("{}", msg);
-                            return Status::not_found(msg);
-                        }
+                        let requested_queue = match queues_read.get(&queue_name) {
+                            Some(queue) => queue,
+                            None => {
+                                let msg = "requested queue doesn't exist";
+                                error!("{}", msg);
+                                return Status::not_found(msg);
+                            }
+                        };
+
+                        let mut queue = requested_queue.lock().unwrap();
+                        queue.pop_front()
                     };
 
-                    let mut queue = requested_queue.lock().unwrap();
-                    queue.pop_front()
-                };
+                    if let Some(message) = message {
+                        if !auto_ack {
+                            let mut acks = acks_arc.write().unwrap();
+                            // TODO(msaff): add proper error handling
+                            let _ = RuusterQueues::track_message_delivery(
+                                &mut acks,
+                                message.clone(),
+                                DEFAULT_ACK_DURATION,
+                            );
+                        }
 
-                if let Some(message) = message {
-                    if !auto_ack {
-                        let mut acks = acks_arc.write().unwrap();
-                        // TODO(msaff): add proper error handling
-                        let _ = RuusterQueues::track_message_delivery(
-                            &mut acks,
-                            message.clone(),
-                            DEFAULT_ACK_DURATION,
-                        );
+                        let msg = protos::Message {
+                            ..Default::default()
+                        };
+                        if let Err(e) = tx.send(Ok(msg)).await {
+                            let msg = format!("error while sending message to channel");
+                            error!(error=%e, "{}", msg);
+                            return Status::internal(msg);
+                        }
+                        info!("message correclty sent over channel");
+                    } else {
+                        tokio::task::yield_now().await;
                     }
-
-                    if let Err(e) = tx.send(Ok(message)).await {
-                        let msg = format!("error while sending message to channel");
-                        error!(error=%e, "{}", msg);
-                        return Status::internal(msg);
-                    }
-                    info!("message correclty sent over channel");
-                } else {
-                    tokio::task::yield_now().await;
                 }
             }
-        }.instrument(span)
+            .instrument(span),
         );
         ReceiverStream::new(rx)
     }

@@ -1,0 +1,8 @@
+[package]
+name = "internals"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.21"
+uuid = { version = "1.8.0", features = ["v4"]}
