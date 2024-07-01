@@ -17,3 +17,4 @@ Cargo.lock
 .idea/
 
 *.png
+run_test.sh

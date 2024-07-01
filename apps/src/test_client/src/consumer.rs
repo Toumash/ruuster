@@ -1,13 +1,10 @@
 use clap::{Parser, ValueEnum};
-use protos::{
-    ruuster_client::RuusterClient, AckMessageBulkRequest, AckRequest, ConsumeRequest, Message,
-};
+use protos::{ruuster_client::RuusterClient, AckMessageBulkRequest, AckRequest, ConsumeRequest};
 use rand::Rng;
 use std::cmp::PartialEq;
 use std::time::Duration;
 use tokio::time::Instant;
-use tokio_stream::Elapsed;
-use tonic::{async_trait, transport::Channel, Response, Status};
+use tonic::{async_trait, transport::Channel, Status};
 use tracing::{debug, error, info};
 use tracing_subscriber::EnvFilter;
 
@@ -52,7 +49,7 @@ type UuidSerialized = String;
 
 // notice(msaff): this should probably be in some kind of config file global to all consumers
 const BULK_ACK_AMOUNT: usize = 20;
-const CONSUMER_TIMEOUT: tokio::time::Duration = tokio::time::Duration::from_secs(5);
+const CONSUMER_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(PartialEq)]
 enum AckMode {
@@ -208,7 +205,7 @@ impl ConsumingMethodStrategy for StreamConsumingMethod {
                         msg
                     } else {
                         error!("message is none");
-                        return Err(tonic::Status::internal("message is none").into());
+                        return Err(Status::internal("message is none").into());
                     }
                 }
                 Err(e) => {
@@ -221,7 +218,7 @@ impl ConsumingMethodStrategy for StreamConsumingMethod {
                 let mut rng = rand::thread_rng();
                 rng.gen_range(delay.0..=delay.1) as u64
             };
-            tokio::time::sleep(tokio::time::Duration::from_millis(workload_ms)).await;
+            tokio::time::sleep(Duration::from_millis(workload_ms)).await;
             debug!(uuid=%message.uuid, "consumed message");
             consume_counter += 1;
 
@@ -274,9 +271,7 @@ impl ConsumingMethodStrategy for SingleConsumingMethod {
             };
 
             let message = match client.consume_one(request).await {
-                Ok(response) => {
-                    response.into_inner()
-                },
+                Ok(response) => response.into_inner(),
                 Err(e) => {
                     if e.code() == tonic::Code::NotFound {
                         debug!("no message on a queue, waiting for 100ms before trying again");
@@ -350,6 +345,9 @@ async fn run_consumer(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     let filter_layer = EnvFilter::try_from_default_env()?;
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(filter_layer)

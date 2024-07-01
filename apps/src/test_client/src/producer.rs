@@ -3,10 +3,27 @@ use std::time::Duration;
 use clap::Parser;
 use protos::{ruuster_client::RuusterClient, ProduceRequest};
 use tonic::transport::Channel;
-use tracing::info;
+use tracing::{error, info};
 
 mod config_definition;
-mod metadata_parser;
+
+fn parse_metadata(config_metadata: &Option<String>) -> Option<protos::Metadata> {
+    match config_metadata {
+        None => None,
+        Some(meta) => {
+            let meta_parsed: config_definition::Metadata = match serde_json::from_str(meta) {
+                Ok(value) => value,
+                Err(e) => {
+                    error!(error=%e, "error while parsing metadata");
+                    return None;
+                }
+            };
+            Some(protos::Metadata {
+                routing_key: Some(protos::RoutingKey{ value: meta_parsed.routing_key.clone()})
+            })
+        },
+    }
+}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -39,7 +56,7 @@ async fn run_producer(
         let request = ProduceRequest {
             payload,
             exchange_name: args.destination.clone(),
-            metadata: metadata_parser::parse_metadata(&metadata_arg),
+            metadata: parse_metadata(&metadata_arg),
         };
         client.produce(request).await?;
         // debug!(message=%request, "produce request");
@@ -55,6 +72,9 @@ async fn run_producer(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     let subscriber = tracing_subscriber::fmt().compact().finish();
     tracing::subscriber::set_global_default(subscriber).expect("failed to setup producer logs");
     

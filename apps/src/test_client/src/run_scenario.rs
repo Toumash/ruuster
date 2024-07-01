@@ -210,6 +210,9 @@ impl ProcessManager {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     let filter_layer = EnvFilter::try_from_default_env()?;
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(filter_layer)

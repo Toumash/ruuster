@@ -1,16 +1,13 @@
 use clap::Parser;
 use config_definition::ScenarioConfig;
-use protos::{
-    ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition,
-    QueueDeclareRequest,
-};
+use protos::{ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition, QueueDeclareRequest};
 use tonic::transport::Channel;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 mod conf_parser;
 mod config_definition;
-mod metadata_parser;
+
 
 struct ScenarioBuilder {
     config: ScenarioConfig,
@@ -75,7 +72,7 @@ impl ScenarioBuilder {
             for bind in &exchange.bindings {
                 let bind_metadata = match &bind.bind_metadata {
                     None => None,
-                    Some(bm) => Some(protos::Metadata {
+                    Some(bm) => Some(protos::BindMetadata {
                         routing_key: Some(protos::RoutingKey {
                             value: bm.routing_key.clone(),
                         }),
@@ -109,6 +106,10 @@ async fn build_scenario(args: Args) -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    //TODO: export this to external module
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "info");
+    }
     let filter_layer = EnvFilter::try_from_default_env()?;
     let subscriber = tracing_subscriber::fmt()
         .with_env_filter(filter_layer)
