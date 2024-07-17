@@ -39,7 +39,7 @@ jobs:
           toolchain: stable
           override: true
       - name: Start Ruuster server
-        run: cargo run --bin server
+        run: cargo run --bin server &
       - name: Run e2e test
         env: 
           RUUSTER_BUILD_DIR: target/debug
