@@ -1,0 +1,251 @@
+{
+    "server_metadata": {
+        "name": "big-boy",
+        "server_addr": "http://127.0.0.1:50051",
+        "comment": "stress test with heavy workload"
+    },
+    "queues": [
+        {
+            "name": "q0"
+        },
+        {
+            "name": "q1"
+        },
+        {
+            "name": "q2"
+        },
+        {
+            "name": "q3"
+        },
+        {
+            "name": "q4"
+        },
+        {
+            "name": "q5"
+        },
+        {
+            "name": "q6"
+        },
+        {
+            "name": "q7"
+        },
+        {
+            "name": "q8"
+        },
+        {
+            "name": "q9"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "e0",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q1",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q2",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q3",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q4",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q5",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q6",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q7",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q8",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q9",
+                    "bind_metadata": null
+                }
+            ]
+        },
+        {
+            "name": "e1",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q1",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q2",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q3",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q4",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q5",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q6",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q7",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q8",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q9",
+                    "bind_metadata": null
+                }
+            ]
+        }
+    ],
+    "producers": [
+        {
+            "name": "p0",
+            "destination": "e0",
+            "messages_produced": 100,
+            "message_payload_bytes": 10000,
+            "post_message_delay_ms": 10
+        },
+        {
+            "name": "p1",
+            "destination": "e1",
+            "messages_produced": 100,
+            "message_payload_bytes": 10000,
+            "post_message_delay_ms": 10 
+        }
+    ],
+    "consumers": [
+        {
+            "name": "c0",
+            "source": "q0",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c1",
+            "source": "q1",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c2",
+            "source": "q2",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c3",
+            "source": "q3",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c4",
+            "source": "q4",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c5",
+            "source": "q5",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c6",
+            "source": "q6",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c7",
+            "source": "q7",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c8",
+            "source": "q8",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c9",
+            "source": "q9",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        }
+    ]
+}

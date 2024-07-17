@@ -1,0 +1,62 @@
+{
+    "server_metadata": {
+        "name": "small_test",
+        "server_addr": "http://127.0.0.1:50051",
+        "comment": "trivial test with two queues bound to a single exchange"
+    },
+    "queues": [
+        {
+            "name": "q0"
+        },
+        {
+            "name": "q1"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "e0",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "bind_metadata": null
+                },
+                {
+                    "queue_name": "q1",
+                    "bind_metadata": null
+                }
+            ]
+        }
+    ],
+    "producers": [
+        {
+            "name": "p0",
+            "destination": "e0",
+            "messages_produced": 5,
+            "message_payload_bytes": 100,
+            "post_message_delay_ms": 100
+        }
+    ],
+    "consumers": [
+        {
+            "name": "c0",
+            "source": "q0",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        },
+        {
+            "name": "c1",
+            "source": "q1",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        }
+    ]
+}

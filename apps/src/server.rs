@@ -1,16 +1,15 @@
-use std::fs;
-use protos::ruuster_server::RuusterServer;
-use ruuster_grpc::RuusterQueuesGrpc;
-use tonic::transport::Server;
 use opentelemetry::{trace::TraceError, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{
-    runtime, trace as sdktrace, Resource,
-};
+use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
+use protos::ruuster_server::RuusterServer;
+use ruuster_grpc::RuusterQueuesGrpc;
+use std::fs;
+use tonic::transport::Server;
 use tracing::info;
+use tracing::level_filters::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::Registry;
+use tracing_subscriber::{filter, Layer, Registry};
 
 const SERVER_IP: &str = "127.0.0.1";
 const SERVER_PORT: &str = "50051";
@@ -35,8 +34,17 @@ fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tracer = init_tracer().expect("Failed to initialize tracer.");
+    let filter_layer = filter::Targets::new().with_targets([
+        ("ruuster_grpc", LevelFilter::INFO),
+        ("queues", LevelFilter::INFO),
+        ("exchanges", LevelFilter::INFO),
+    ]);
+    let stdout_log = tracing_subscriber::fmt::layer().pretty();
     let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-    let subscriber = Registry::default().with(telemetry);
+    let subscriber = Registry::default()
+        .with(telemetry)
+        .with(filter_layer)
+        .with(stdout_log.with_filter(filter::LevelFilter::INFO));
     tracing::subscriber::set_global_default(subscriber)?;
 
     let addr = format!("{}:{}", SERVER_IP, SERVER_PORT).parse().unwrap();

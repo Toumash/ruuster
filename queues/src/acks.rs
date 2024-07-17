@@ -6,7 +6,7 @@ use std::{
 use internals::Message;
 use tonic::Status;
 
-use tracing::{self as log, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 type UuidSerialized = String;
 
@@ -18,13 +18,6 @@ pub struct AckRecord {
     timestamp: Instant,
     duration: Duration,
 }
-
-// TODO (msaff): LATER
-// used for sorting Acks by
-// pub struct AckNode {
-//     deadline: Instant,
-//     message: Arc<Message>
-// }
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum AckStatus {
@@ -83,7 +76,8 @@ impl ApplyAck for AckContainer {
     #[instrument(skip_all, fields(uuids=?uuids))]
     fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status> {
         for item in uuids {
-            self.apply_ack(item)?;
+            // note (msaff): we can safely ignore errors from apply_ack - we want to continue to ack messages from array
+            let _ = self.apply_ack(item);
         }
         Ok(())
     }
@@ -115,15 +109,15 @@ impl AckRecord {
 
     pub fn apply_ack(&mut self) -> Result<(), AckStatus> {
         if self.is_deadline_exceeded() {
-            log::info!("deadline exceeded for message: {}", self.get_message().uuid);
+            info!("deadline exceeded for message: {}", self.get_message().uuid);
             return Err(AckStatus::DeadlineExceeded);
         }
         if self.counter <= 0 {
-            log::info!("message {} already acked", self.get_message().uuid);
+            info!("message {} already acked", self.get_message().uuid);
             return Err(AckStatus::MessageAlreadyAcked);
         }
 
-        log::debug!("message acked: {}", self.message.uuid);
+        debug!("message acked: {}", self.message.uuid);
         self.counter -= 1;
         Ok(())
     }

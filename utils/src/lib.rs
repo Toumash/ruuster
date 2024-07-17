@@ -2,7 +2,7 @@ use std::io;
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
-/// Convinient function for grabing input from user from console.
+/// Convinient function for grabing input from terminal.
 ///
 /// # Examples
 ///

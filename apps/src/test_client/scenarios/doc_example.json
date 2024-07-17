@@ -1,0 +1,45 @@
+{
+    "server_metadata": {
+        "name": "SCENARIO_NAME",
+        "server_addr": "SERVER_ADDR",
+        "comment": "SCENARIO_DESC"
+    },
+    "queues": [
+        {
+            "name": "q0"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "e0",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "bind_metadata": null
+                }
+            ]
+        }
+    ],
+    "producers": [
+        {
+            "name": "p0",
+            "destination": "e0",
+            "messages_produced": 5,
+            "message_payload_bytes": 100,
+            "post_message_delay_ms": 100
+        }
+    ],
+    "consumers": [
+        {
+            "name": "c0",
+            "source": "q0",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 100,
+                "max": 500
+            }
+        }
+    ]
+}
