@@ -38,6 +38,8 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Build Ruuster
+        run: cargo build
       - name: Start Ruuster server
         run: cargo run --bin server &
       - name: Run e2e test
