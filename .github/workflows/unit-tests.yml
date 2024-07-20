@@ -20,6 +20,10 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
