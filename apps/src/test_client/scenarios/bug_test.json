@@ -1,0 +1,46 @@
+{
+    "server_metadata": {
+        "name": "bug",
+        "server_addr": "http://127.0.0.1:50051",
+        "comment": "this test shows all of consume/ack combinations"
+    },
+    "queues": [
+        {
+            "name": "q0"
+        }
+    ],
+    "exchanges": [
+        {
+            "name": "e0",
+            "kind": 0,
+            "bindings": [
+                {
+                    "queue_name": "q0",
+                    "bind_metadata": null
+                }
+            ]
+        }
+    ],
+    "producers": [
+        {
+            "name": "p0",
+            "destination": "e0",
+            "messages_produced": 2,
+            "message_payload_bytes": 10,
+            "post_message_delay_ms": 10,
+            "metadata": null
+        }
+    ],
+    "consumers": [
+        {
+            "name": "c0",
+            "source": "q0",
+            "consuming_method": "stream",
+            "ack_method": "auto",
+            "workload_ms": {
+                "min": 0,
+                "max": 0
+            }
+        }
+    ]
+}

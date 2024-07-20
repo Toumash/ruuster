@@ -84,7 +84,7 @@ impl Exchange for DirectExchange {
             Some(q) => q,
             None => {
                 return Err(ExchangeError::NoMatchingQueue {
-                    route_key: String::from(route_key),
+                    route_key,
                 })
             }
         };

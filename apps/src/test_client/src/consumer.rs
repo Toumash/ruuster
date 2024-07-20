@@ -53,8 +53,8 @@ const CONSUMER_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[derive(PartialEq)]
 enum AckMode {
-    NORMAL,
-    FORCE,
+    Normal,
+    Force,
 }
 
 #[async_trait]
@@ -129,7 +129,7 @@ impl AckMethodStrategy for BulkAckMethod {
         uuid: &UuidSerialized,
         mode: AckMode,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        if mode == AckMode::FORCE {
+        if mode == AckMode::Force {
             info!(amount=%self.uuids.len(), "acking messages with AckMode::FORCE");
             let request = AckMessageBulkRequest {
                 uuids: self.uuids.clone(),
@@ -223,13 +223,13 @@ impl ConsumingMethodStrategy for StreamConsumingMethod {
             consume_counter += 1;
 
             self.ack_method
-                .acknowledge(client, &message.uuid, AckMode::NORMAL)
+                .acknowledge(client, &message.uuid, AckMode::Normal)
                 .await?;
         }
 
         info!(consume_counter=%consume_counter, "end of consuming");
         self.ack_method
-            .acknowledge(client, &UuidSerialized::new(), AckMode::FORCE)
+            .acknowledge(client, &UuidSerialized::new(), AckMode::Force)
             .await?;
         Ok(())
     }
@@ -294,13 +294,13 @@ impl ConsumingMethodStrategy for SingleConsumingMethod {
             consume_counter += 1;
 
             self.ack_method
-                .acknowledge(client, &message.uuid, AckMode::NORMAL)
+                .acknowledge(client, &message.uuid, AckMode::Normal)
                 .await?;
             start_time = Instant::now();
         }
         info!(consume_counter=%consume_counter, "end of consuming");
         self.ack_method
-            .acknowledge(client, &UuidSerialized::new(), AckMode::FORCE)
+            .acknowledge(client, &UuidSerialized::new(), AckMode::Force)
             .await?;
         Ok(())
     }
@@ -314,19 +314,19 @@ async fn run_consumer(
         match (&args.ack_method, &args.consuming_method) {
             (AckMethod::Auto, ConsumingMethod::Single) => Box::new(SingleConsumingMethod::new(
                 args.source.clone(),
-                Box::new(AutoAckMethod::default()),
+                Box::new(AutoAckMethod),
             )),
             (AckMethod::Auto, ConsumingMethod::Stream) => Box::new(StreamConsumingMethod::new(
                 args.source.clone(),
-                Box::new(AutoAckMethod::default()),
+                Box::new(AutoAckMethod),
             )),
             (AckMethod::Single, ConsumingMethod::Single) => Box::new(SingleConsumingMethod::new(
                 args.source.clone(),
-                Box::new(SingleAckMethod::default()),
+                Box::new(SingleAckMethod),
             )),
             (AckMethod::Single, ConsumingMethod::Stream) => Box::new(StreamConsumingMethod::new(
                 args.source.clone(),
-                Box::new(SingleAckMethod::default()),
+                Box::new(SingleAckMethod),
             )),
             (AckMethod::Bulk, ConsumingMethod::Single) => Box::new(SingleConsumingMethod::new(
                 args.source.clone(),

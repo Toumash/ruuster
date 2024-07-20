@@ -18,6 +18,12 @@ impl RuusterQueuesGrpc {
     }
 }
 
+impl Default for RuusterQueuesGrpc {
+    fn default() -> Self {
+        RuusterQueuesGrpc::new()
+    }
+}
+
 #[tonic::async_trait]
 impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
     #[instrument(skip_all, fields(request=?request))]
@@ -117,12 +123,9 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
             .consume_message(&request.queue_name, request.auto_ack)?;
         let msg = protos::Message {
             metadata: match message.metadata {
-                Some(m) => match m.routing_key {
-                    Some(rk) => Some(protos::Metadata {
-                        routing_key: Some(RoutingKey { value: rk }),
-                    }),
-                    None => None,
-                },
+                Some(m) => m.routing_key.map(|rk| protos::Metadata {
+                    routing_key: Some(RoutingKey { value: rk }),
+                }),
                 None => None,
             },
             payload: message.payload,
@@ -142,7 +145,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
             dead_letter: None,
             routing_key: request
                 .metadata
-                .map_or(None, |m| Some(m.routing_key.unwrap().value)),
+                .map(|m| m.routing_key.unwrap().value),
         });
         self.0
             .forward_message(request.payload, &request.exchange_name, metadata)?;

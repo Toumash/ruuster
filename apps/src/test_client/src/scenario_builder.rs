@@ -1,13 +1,15 @@
 use clap::Parser;
 use config_definition::ScenarioConfig;
-use protos::{ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition, QueueDeclareRequest};
+use protos::{
+    ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition,
+    QueueDeclareRequest,
+};
 use tonic::transport::Channel;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
 mod conf_parser;
 mod config_definition;
-
 
 struct ScenarioBuilder {
     config: ScenarioConfig,
@@ -70,14 +72,11 @@ impl ScenarioBuilder {
         for exchange in &self.config.exchanges {
             let exchange_name = exchange.name.to_owned();
             for bind in &exchange.bindings {
-                let bind_metadata = match &bind.bind_metadata {
-                    None => None,
-                    Some(bm) => Some(protos::BindMetadata {
-                        routing_key: Some(protos::RoutingKey {
-                            value: bm.routing_key.clone(),
-                        }),
+                let bind_metadata = bind.bind_metadata.as_ref().map(|bm| protos::BindMetadata {
+                    routing_key: Some(protos::RoutingKey {
+                        value: bm.routing_key.clone(),
                     }),
-                };
+                });
                 self.client
                     .bind(BindRequest {
                         metadata: bind_metadata,
@@ -101,7 +100,7 @@ async fn build_scenario(args: Args) -> Result<(), Box<dyn std::error::Error>> {
     builder.setup_queues().await?;
     builder.setup_exchanges().await?;
     builder.setup_binds().await?;
-    return Ok(());
+    Ok(())
 }
 
 #[tokio::main]
