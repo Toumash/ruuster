@@ -337,7 +337,7 @@ impl RuusterQueues {
             queue_name=%queue_name,
             auto_ack=%auto_ack
         );
-        let _ = span.in_scope(|| {
+        span.in_scope(|| {
             info!("spawning consuming task");
         });
 
@@ -380,7 +380,7 @@ impl RuusterQueues {
                             ..Default::default()
                         };
                         if let Err(e) = tx.send(Ok(msg)).await {
-                            let msg = format!("error while sending message to channel");
+                            let msg = "error while sending message to channel";
                             error!(error=%e, "{}", msg);
                             return Status::internal(msg);
                         }

@@ -110,8 +110,8 @@ impl From<ExchangeKind> for i32 {
 impl Display for ExchangeKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            ExchangeKind::Fanout => write!(f, "{}", "ExchangeKind::Fanout"),
-            ExchangeKind::Direct => write!(f, "{}", "ExchangeKind::Direct"),
+            ExchangeKind::Fanout => write!(f, "ExchangeKind::Fanout"),
+            ExchangeKind::Direct => write!(f, "ExchangeKind::Direct"),
         }
     }
 }
@@ -169,10 +169,10 @@ pub(crate) trait PushToQueueStrategy {
             } else {
                 info!("message {} dropped", message.uuid);
             }
-            return Ok(PushResult::QueueOverflow);
+            Ok(PushResult::QueueOverflow)
         } else {
             queue_lock.push_back(message);
-            return Ok(PushResult::Ok);
+            Ok(PushResult::Ok)
         }
     }
 }
