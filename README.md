@@ -20,14 +20,14 @@ cargo watch -x 'test'  --ignore protos/
 ---
 # Ruuster workspace
 
-
-| Crate        | Description                                                     | 
-|--------------|:----------------------------------------------------------------|
-| queues       | core ruuster functionalities (queues, acks)
-| exchanges    | library definig exchangers behavior / logic of message trasport | 
-| protos       | library with definitions of gRPC services (proto files)         |
-| ruuster-qrpc | library containing implementation of gRPC server         |
-| utils        | library with common utilities                                   |
-| apps         | crate containing binaries built using our project               |
+| Crate        | Description                                                       | 
+|--------------|:------------------------------------------------------------------|
+| queues       | core ruuster functionalities (queues, acks)                       |
+| internals    | declarations of internal types used by ruuster                    |
+| exchanges    | library defining exchangers behavior / logic of message trasport  | 
+| protos       | library with definitions of gRPC services (proto files)           |
+| ruuster-qrpc | library containing implementation of gRPC server                  |
+| utils        | library with common utilities                                     |
+| apps         | crate containing binaries built using our project                 |
 
 
