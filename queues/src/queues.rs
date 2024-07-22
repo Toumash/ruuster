@@ -363,7 +363,6 @@ impl RuusterQueues {
                     if let Some(message) = message {
                         if !auto_ack {
                             let mut acks = acks_arc.write().unwrap();
-                            // TODO(msaff): add proper error handling
                             match RuusterQueues::track_message_delivery(
                                 &mut acks,
                                 message.clone(),
@@ -376,10 +375,8 @@ impl RuusterQueues {
                             }
                         }
 
-                        let msg = protos::Message {
-                            ..Default::default()
-                        };
-                        if let Err(e) = tx.send(Ok(msg)).await {
+                        let proto_message = protos::Message::from(message);
+                        if let Err(e) = tx.send(Ok(proto_message)).await {
                             let msg = "error while sending message to channel";
                             error!(error=%e, "{}", msg);
                             return Status::internal(msg);

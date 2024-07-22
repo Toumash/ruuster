@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 prost = "0.12.4"
 tonic = "0.11.0"
+internals = { path = "../internals" }
 
 [build-dependencies]
 tonic-build = "0.11.0"

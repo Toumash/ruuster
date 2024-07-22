@@ -149,6 +149,7 @@ pub async fn produce_n_random_messages(
     exchange_name: ExchangeName,
     n: u32,
     should_fail: bool,
+    produce_stop_token: bool,
 ) -> Vec<String> {
     let mut result = vec![];
     for _ in 0..n {
@@ -173,6 +174,18 @@ pub async fn produce_n_random_messages(
                 response.unwrap_err()
             );
         }
+    }
+    if produce_stop_token {
+        let payload = "STOP";
+        let request = ProduceRequest {
+            exchange_name: exchange_name.clone(),
+            payload: payload.into(),
+            metadata: None,
+        };
+        client
+            .produce(request)
+            .await
+            .expect("failed to produce STOP message");
     }
     result
 }
@@ -201,6 +214,35 @@ pub async fn consume_messages(
             let consumed_payload = response.unwrap().into_inner().payload;
             assert_eq!(consumed_payload, payload.to_owned());
         }
+    }
+}
+
+pub async fn consume_message_bulk(
+    client: &mut RuusterClient<Channel>,
+    queue_name: QueueName,
+    payloads: &Vec<String>,
+) {
+    let request = ConsumeRequest {
+        queue_name: queue_name.clone(),
+        auto_ack: true,
+    };
+
+    let mut response_stream = client
+        .consume_bulk(request)
+        .await
+        .expect("failed to receive a response stream")
+        .into_inner();
+    let mut payload_idx = 0;
+    while let Some(message) = response_stream
+        .message()
+        .await
+        .expect("failed to receive a message from a stream")
+    {
+        if message.payload == "STOP" {
+            break;
+        }
+        assert_eq!(message.payload, payloads[payload_idx]);
+        payload_idx += 1;
     }
 }
 

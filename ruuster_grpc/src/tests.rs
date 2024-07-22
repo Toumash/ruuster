@@ -100,7 +100,7 @@ async fn test_produce_and_consume_sqsfe() {
 
     setup_sqsfe_scenario(&mut client).await;
 
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 2, false).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 2, false, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads, false).await;
 }
 
@@ -110,7 +110,7 @@ async fn test_produce_and_consume_mqsfe() {
 
     setup_mqsfe_scenario(&mut client).await;
 
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads, false).await;
     consume_messages(&mut client, "q2".to_string(), &payloads, false).await;
 }
@@ -121,8 +121,10 @@ async fn test_produce_and_consume_sqmfe() {
 
     setup_sqmfe_scenario(&mut client).await;
 
-    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
-    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 10, false).await;
+    let payloads1 =
+        produce_n_random_messages(&mut client, "e1".to_string(), 10, false, false).await;
+    let payloads2 =
+        produce_n_random_messages(&mut client, "e2".to_string(), 10, false, false).await;
 
     consume_messages(&mut client, "q1".to_string(), &payloads1, false).await;
     consume_messages(&mut client, "q1".to_string(), &payloads2, false).await;
@@ -134,8 +136,10 @@ async fn test_produce_and_consume_mqmfe() {
 
     setup_mqmfe_scenario(&mut client).await;
 
-    let payloads1 = produce_n_random_messages(&mut client, "e1".to_string(), 100, false).await;
-    let payloads2 = produce_n_random_messages(&mut client, "e2".to_string(), 100, false).await;
+    let payloads1 =
+        produce_n_random_messages(&mut client, "e1".to_string(), 100, false, false).await;
+    let payloads2 =
+        produce_n_random_messages(&mut client, "e2".to_string(), 100, false, false).await;
 
     consume_messages(&mut client, "q1".to_string(), &payloads1, false).await;
     consume_messages(&mut client, "q2".to_string(), &payloads1, false).await;
@@ -148,6 +152,15 @@ async fn test_produce_and_consume_mqmfe() {
 async fn test_ack_ok() {
     let mut client = setup_server_and_client().await;
     setup_sqsfe_scenario(&mut client).await;
-    let _ = produce_n_random_messages(&mut client, "e1".to_string(), 10, false).await;
+    let _ = produce_n_random_messages(&mut client, "e1".to_string(), 10, false, false).await;
     consume_and_ack_messages(&mut client, "q1".to_string(), false, 10).await;
+}
+
+#[tokio::test]
+async fn test_stream_consuming() {
+    let mut client = setup_server_and_client().await;
+    setup_sqsfe_scenario(&mut client).await;
+    let payloads =
+        produce_n_random_messages(&mut client, "e1".to_string(), 100, false, true).await;
+    consume_message_bulk(&mut client, "q1".into(), &payloads).await;
 }
