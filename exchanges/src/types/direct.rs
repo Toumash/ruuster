@@ -77,7 +77,7 @@ impl Exchange for DirectExchange {
         let metadata = message
             .metadata
             .as_ref()
-            .ok_or(ExchangeError::MessageWitoutMetadata)?;
+            .ok_or(ExchangeError::MessageWithoutMetadata)?;
 
         let routing_map = &self.routing_map;
 

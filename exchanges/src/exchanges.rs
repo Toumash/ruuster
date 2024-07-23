@@ -31,8 +31,7 @@ pub enum ExchangeError {
     EmptyPayloadFail,
     DeadLetterQueueLockFail,
     NoRouteKey,
-    MessageWitoutMetadata,
-    PushToQueueFailed
+    MessageWithoutMetadata
 }
 
 impl fmt::Display for ExchangeError {
@@ -48,16 +47,13 @@ impl fmt::Display for ExchangeError {
                 f,
                 "handling message failed: queue().lock() failed for dead letter queue"
             ),
-            ExchangeError::MessageWitoutMetadata => write!(
+            ExchangeError::MessageWithoutMetadata => write!(
                 f,
                 "handling message failed: insufficient metadata in message"
             ),
             ExchangeError::NoRouteKey => {
                 write!(f, "No routing key found")
             }
-            ExchangeError::PushToQueueFailed => {
-                write!(f, "handling message failed: push to a queue failed")
-            },
         }
     }
 }
