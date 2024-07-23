@@ -29,9 +29,10 @@ pub enum ExchangeKind {
 pub enum ExchangeError {
     BindFail,
     EmptyPayloadFail,
-    DeadLetterQueueLockFail {},
+    DeadLetterQueueLockFail,
     NoRouteKey,
-    NoMatchingQueue { route_key: String },
+    MessageWitoutMetadata,
+    PushToQueueFailed
 }
 
 impl fmt::Display for ExchangeError {
@@ -41,19 +42,22 @@ impl fmt::Display for ExchangeError {
                 write!(f, "binding to exchange failed")
             }
             ExchangeError::EmptyPayloadFail => {
-                write!(f, "handling message failed")
+                write!(f, "handling message failed: empty payload")
             }
             ExchangeError::DeadLetterQueueLockFail {} => write!(
                 f,
                 "handling message failed: queue().lock() failed for dead letter queue"
             ),
-
-            ExchangeError::NoMatchingQueue { route_key } => {
-                write!(f, "No matching queue for route key {}", route_key)
-            }
+            ExchangeError::MessageWitoutMetadata => write!(
+                f,
+                "handling message failed: insufficient metadata in message"
+            ),
             ExchangeError::NoRouteKey => {
                 write!(f, "No routing key found")
             }
+            ExchangeError::PushToQueueFailed => {
+                write!(f, "handling message failed: push to a queue failed")
+            },
         }
     }
 }

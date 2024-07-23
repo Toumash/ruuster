@@ -1,20 +1,21 @@
-use tracing::info;
 use std::collections::hash_map::Entry;
-use std::collections::HashSet;
-
+use std::collections::{HashMap, HashSet};
+use tracing::{debug, error, instrument};
 
 use crate::*;
+
+type RoutingKey = String;
 
 #[derive(Default)]
 pub struct DirectExchange {
     bound_queues: HashSet<QueueName>,
-    routing_map: HashMap<String, HashSet<QueueName>>,
-    exchange_name: String,
+    routing_map: HashMap<QueueName, HashSet<RoutingKey>>, // allow multiple bindings exchange and queue
+    exchange_name: ExchangeName,
 }
 
 impl DirectExchange {
     #[allow(dead_code)] // this is currently only used in tests
-    fn new(exchange_name: String) -> Self {
+    fn new(exchange_name: ExchangeName) -> Self {
         DirectExchange {
             bound_queues: HashSet::new(),
             exchange_name,
@@ -26,37 +27,40 @@ impl DirectExchange {
 impl PushToQueueStrategy for DirectExchange {}
 
 impl Exchange for DirectExchange {
+    #[instrument(skip_all, fields(exchange_name=%self.exchange_name, queue_name=%queue_name))]
     fn bind(
         &mut self,
         queue_name: &QueueName,
         metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError> {
-        let metadata = match metadata {
-            Some(data) => data,
-            None => return Err(ExchangeError::BindFail),
-        };
+        let metadata = metadata.ok_or_else(|| {
+            error!("metadata is required for DirectExchange binding");
+            ExchangeError::BindFail
+        })?;
 
-        let route_key = match &metadata.routing_key {
-            Some(key) => key.value.clone(),
-            None => return Err(ExchangeError::BindFail),
-        };
+        let routing_key = metadata.routing_key.as_ref().ok_or_else(|| {
+            error!("routing_key is required for DirectExchange binding");
+            ExchangeError::BindFail
+        })?;
 
-        match self.routing_map.entry(route_key) {
-            Entry::Occupied(o) => {
-                let value = o.into_mut();
-                match value.get(queue_name) {
-                    Some(_) => return Err(ExchangeError::BindFail),
-                    None => value.insert(queue_name.to_string()),
-                };
+        match self.routing_map.entry(queue_name.into()) {
+            Entry::Occupied(mut entry) => {
+                debug!("adding bind to an existing routing_map entry");
+                if !entry.get_mut().insert(routing_key.value.clone()) {
+                    error!("this binding already exists");
+                    return Err(ExchangeError::BindFail);
+                }
             }
-            Entry::Vacant(v) => {
-                v.insert(HashSet::from([queue_name.to_string()]));
+            Entry::Vacant(_) => {
+                debug!("adding new entry to routing_map");
+                self.routing_map.insert(
+                    queue_name.into(),
+                    HashSet::from([routing_key.value.clone()]),
+                );
             }
         };
 
-        if !self.bound_queues.insert(queue_name.clone()) {
-            info!("Updating queue named: {}", queue_name);
-        }
+        self.bound_queues.insert(queue_name.into());
 
         Ok(())
     }
@@ -70,39 +74,34 @@ impl Exchange for DirectExchange {
         message: Message,
         queues: Arc<RwLock<QueueContainer>>,
     ) -> Result<u32, ExchangeError> {
-        let metadata = match &message.metadata {
-            Some(data) => data,
-            None => return Err(ExchangeError::BindFail),
-        };
+        let metadata = message
+            .metadata
+            .as_ref()
+            .ok_or(ExchangeError::MessageWitoutMetadata)?;
 
-        let route_key = match &metadata.routing_key {
-            Some(key) => key.clone(),
-            None => return Err(ExchangeError::BindFail),
-        };
+        let routing_map = &self.routing_map;
 
-        let bound_queues = match self.routing_map.get(&route_key) {
-            Some(q) => q,
-            None => {
-                return Err(ExchangeError::NoMatchingQueue {
-                    route_key,
-                })
-            }
-        };
+        let routing_key = metadata.routing_key.as_ref().ok_or(ExchangeError::NoRouteKey)?;
 
         let queues_read = queues.read().unwrap();
         let mut pushed_counter: u32 = 0;
 
-        for name in bound_queues {
-            if let Some(queue) = queues_read.get(name) {
-                if self.push_to_queue(
-                    &self.exchange_name,
-                    message.clone(),
-                    queue,
-                    name,
-                    &queues_read,
-                )? == PushResult::Ok
-                {
-                    pushed_counter += 1;
+        for (queue_name, keys) in routing_map {
+            if let Some(queue) = queues_read.get(queue_name) {
+                for key in keys {
+                    if key != routing_key {
+                        continue;
+                    }
+                    if self.push_to_queue(
+                        &self.exchange_name,
+                        message.clone(),
+                        queue,
+                        queue_name,
+                        &queues_read,
+                    )? == PushResult::Ok
+                    {
+                        pushed_counter += 1;
+                    }
                 }
             }
         }
@@ -148,6 +147,7 @@ mod tests {
 
     #[test]
     fn duplicate_queue_different_routing_bind_test() {
+        //TODO: test must be adjusted, len of bound_queue_names != bind count
         let mut ex = DirectExchange::default();
         assert!(ex
             .bind(
