@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tracing::{info, instrument, Span};
+use tracing::{info, error, instrument, Span};
 
 use crate::*;
 
@@ -8,6 +8,7 @@ use crate::*;
 pub struct FanoutExchange {
     bound_queues: HashSet<QueueName>,
     exchange_name: String,
+    bind_count: u32
 }
 
 impl FanoutExchange {
@@ -16,6 +17,7 @@ impl FanoutExchange {
         FanoutExchange {
             bound_queues: HashSet::new(),
             exchange_name,
+            bind_count: 0u32
         }
     }
 }
@@ -29,8 +31,12 @@ impl Exchange for FanoutExchange {
         _metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError> {
         if !self.bound_queues.insert(queue_name.clone()) {
+            error!("bind with this name already exists");
             return Err(ExchangeError::BindFail);
         }
+
+        self.bind_count += 1;
+
         Ok(())
     }
 
@@ -73,6 +79,10 @@ impl Exchange for FanoutExchange {
 
         Ok(pushed_counter)
     }
+    
+    fn get_bind_count(&self) -> u32 {
+        self.bind_count
+    }
 }
 
 #[cfg(test)]
@@ -80,11 +90,6 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    // use lazy_static::lazy_static;
-    // lazy_static! {
-    //     static ref DUMMY_METADATA: Metadata = Metadata{ routing_key: None };
-    // }
-
     /**
      * Creates 3 queues with names: "q1", "q2", "q3"
      */
@@ -229,5 +234,17 @@ mod tests {
 
         // assert
         assert_eq!(message_handled_by_queues_count, 0);
+    }
+
+    #[test]
+    fn bind_count_test() {
+        let _queues = setup_test_queues();
+        let mut ex = FanoutExchange::default();
+
+        assert_eq!(ex.bind(&"q1".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), None), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), None), Ok(()));
+
+        assert_eq!(ex.get_bind_count(), 3u32);
     }
 }

@@ -11,6 +11,7 @@ pub struct DirectExchange {
     bound_queues: HashSet<QueueName>,
     routing_map: HashMap<QueueName, HashSet<RoutingKey>>, // allow multiple bindings exchange and queue
     exchange_name: ExchangeName,
+    bind_count: u32
 }
 
 impl DirectExchange {
@@ -20,6 +21,7 @@ impl DirectExchange {
             bound_queues: HashSet::new(),
             exchange_name,
             routing_map: HashMap::new(),
+            bind_count: 0u32
         }
     }
 }
@@ -61,6 +63,7 @@ impl Exchange for DirectExchange {
         };
 
         self.bound_queues.insert(queue_name.into());
+        self.bind_count += 1;
 
         Ok(())
     }
@@ -108,6 +111,10 @@ impl Exchange for DirectExchange {
 
         Ok(pushed_counter)
     }
+    
+    fn get_bind_count(&self) -> u32 {
+        self.bind_count
+    }
 }
 
 #[cfg(test)]
@@ -146,8 +153,30 @@ mod tests {
     }
 
     #[test]
+    fn bind_count_test() {
+        let mut ex: DirectExchange = DirectExchange::default();
+        let bind_metadata1 = BindMetadata {
+            routing_key: Some(RoutingKey {
+                value: "route_1".to_string(),
+            }),
+        };
+        let bind_metadata2 = BindMetadata {
+            routing_key: Some(RoutingKey {
+                value: "route_2".to_string(),
+            }),
+        };
+        assert_eq!(ex.bind(&"q1".to_string(), Some(&bind_metadata1)), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), Some(&bind_metadata1)), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), Some(&bind_metadata1)), Ok(()));
+        assert_eq!(ex.bind(&"q1".to_string(), Some(&bind_metadata2)), Ok(()));
+        assert_eq!(ex.bind(&"q2".to_string(), Some(&bind_metadata2)), Ok(()));
+        assert_eq!(ex.bind(&"q3".to_string(), Some(&bind_metadata2)), Ok(()));
+        assert_eq!(ex.get_bound_queue_names().len(), 3);
+        assert_eq!(ex.get_bind_count(), 6);
+    }
+
+    #[test]
     fn duplicate_queue_different_routing_bind_test() {
-        //TODO: test must be adjusted, len of bound_queue_names != bind count
         let mut ex = DirectExchange::default();
         assert!(ex
             .bind(
@@ -170,6 +199,7 @@ mod tests {
             )
             .is_ok());
         assert_eq!(ex.get_bound_queue_names().len(), 1);
+        
     }
 
     #[test]

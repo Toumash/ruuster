@@ -65,6 +65,7 @@ pub trait Exchange {
         metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError>;
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
+    fn get_bind_count(&self) -> u32;
     fn handle_message(
         &self,
         message: Message,
