@@ -1,8 +1,8 @@
 use protos::{
-    ruuster, AckRequest, ConsumeRequest, Empty, ExchangeDeclareRequest, ListExchangesResponse,
-    ListQueuesResponse, ProduceRequest, QueueDeclareRequest, RoutingKey,
+    ruuster, AckMessageBulkRequest, AckRequest, BindRequest, ConsumeRequest, Empty,
+    ExchangeDeclareRequest, ListExchangesResponse, ListQueuesResponse, ProduceRequest,
+    QueueDeclareRequest, RemoveExchangeRequest, RemoveQueueRequest, RoutingKey, UnbindRequest,
 };
-use protos::{AckMessageBulkRequest, BindRequest};
 use queues::queues::RuusterQueues;
 
 use tokio_stream::wrappers::ReceiverStream;
@@ -143,9 +143,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         let metadata = Some(internals::Metadata {
             created_at: None,
             dead_letter: None,
-            routing_key: request
-                .metadata
-                .map(|m| m.routing_key.unwrap().value),
+            routing_key: request.metadata.map(|m| m.routing_key.unwrap().value),
         });
         self.0
             .forward_message(request.payload, &request.exchange_name, metadata)?;
@@ -169,6 +167,40 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
         self.0.apply_message_bulk_ack(&request.uuids)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    #[instrument(skip_all, fields(request=?request))]
+    async fn unbind(
+        &self,
+        request: tonic::Request<UnbindRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.0.unbind_queue_from_exchange(
+            &request.queue_name,
+            &request.exchange_name,
+            request.metadata.as_ref(),
+        )?;
+        Ok(Response::new(Empty {}))
+    }
+
+    #[instrument(skip_all, fields(request=?request))]
+    async fn remove_queue(
+        &self,
+        request: tonic::Request<RemoveQueueRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.0.remove_queue(&request.queue_name)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    #[instrument(skip_all, fields(request=?request))]
+    async fn remove_exchange(
+        &self,
+        request: tonic::Request<RemoveExchangeRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.0.remove_exchange(&request.exchange_name)?;
         Ok(Response::new(Empty {}))
     }
 }

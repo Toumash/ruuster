@@ -18,6 +18,7 @@ type QueueContainer = HashMap<QueueName, Arc<Mutex<Queue>>>;
 pub type ExchangeName = String;
 pub type ExchangeType = dyn Exchange + Send + Sync;
 pub type ExchangeContainer = HashMap<ExchangeName, Arc<RwLock<ExchangeType>>>;
+pub type MessageCount = u32;
 
 #[derive(PartialEq, Debug)]
 pub enum ExchangeKind {
@@ -30,8 +31,10 @@ pub enum ExchangeError {
     BindFail,
     EmptyPayloadFail,
     DeadLetterQueueLockFail,
-    NoRouteKey,
-    MessageWithoutMetadata
+    RoutingKeyNotFound,
+    MessageWithoutMetadata,
+    MissingRoutingKey,
+    RoutingSetNotFound,
 }
 
 impl fmt::Display for ExchangeError {
@@ -51,8 +54,14 @@ impl fmt::Display for ExchangeError {
                 f,
                 "handling message failed: insufficient metadata in message"
             ),
-            ExchangeError::NoRouteKey => {
+            ExchangeError::RoutingKeyNotFound => {
                 write!(f, "No routing key found")
+            }
+            ExchangeError::MissingRoutingKey => {
+                write!(f, "Routing key is required for this operation")
+            }
+            ExchangeError::RoutingSetNotFound => {
+                write!(f, "There is none routing set assigned to this queue")
             }
         }
     }
@@ -64,13 +73,22 @@ pub trait Exchange {
         queue_name: &QueueName,
         metadata: Option<&protos::BindMetadata>,
     ) -> Result<(), ExchangeError>;
+
+    fn unbind(
+        &mut self,
+        queue_name: &QueueName,
+        metadata: Option<&protos::BindMetadata>,
+    ) -> Result<(), ExchangeError>;
+
     fn get_bound_queue_names(&self) -> HashSet<QueueName>;
+
     fn get_bind_count(&self) -> u32;
+
     fn handle_message(
         &self,
         message: Message,
         queues: Arc<RwLock<QueueContainer>>,
-    ) -> Result<u32, ExchangeError>;
+    ) -> Result<MessageCount, ExchangeError>;
 }
 
 impl ExchangeKind {

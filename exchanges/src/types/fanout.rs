@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use tracing::{info, error, instrument, Span};
+use tracing::{error, info, instrument, Span};
 
 use crate::*;
 
@@ -8,7 +8,7 @@ use crate::*;
 pub struct FanoutExchange {
     bound_queues: HashSet<QueueName>,
     exchange_name: String,
-    bind_count: u32
+    bind_count: u32,
 }
 
 impl FanoutExchange {
@@ -17,7 +17,7 @@ impl FanoutExchange {
         FanoutExchange {
             bound_queues: HashSet::new(),
             exchange_name,
-            bind_count: 0u32
+            bind_count: 0u32,
         }
     }
 }
@@ -79,9 +79,20 @@ impl Exchange for FanoutExchange {
 
         Ok(pushed_counter)
     }
-    
+
     fn get_bind_count(&self) -> u32 {
         self.bind_count
+    }
+
+    fn unbind(
+        &mut self,
+        queue_name: &QueueName,
+        _metadata: Option<&protos::BindMetadata>,
+    ) -> Result<(), ExchangeError> {
+        if !self.bound_queues.remove(queue_name) {
+            warn!(queue_name=%queue_name, "specified binding does not exist");
+        }
+        Ok(())
     }
 }
 
