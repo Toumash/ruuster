@@ -44,7 +44,7 @@ impl RuusterQueues {
 
     // NOTICE: for some reason function parameters must be explicitly specified
     //         eg.: #[instrument(skip(self))] should work exactly the same
-    //         but filtering by tag is broken then even tho queue_name is properly added to tags of span
+    //         but filtering by tag is broken then, even tho queue_name is properly added to tags of span
     //         I suspect that it is some kind of bug on Jaeger side
     #[instrument(skip_all, fields(queue_name=%queue_name))]
     pub fn add_queue(&self, queue_name: &QueueName) -> Result<(), Status> {
@@ -62,6 +62,23 @@ impl RuusterQueues {
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
 
         info!("queue added");
+        Ok(())
+    }
+
+    #[instrument(skip_all, fields(queue_name=%queue_name))]
+    pub fn remove_queue(&self, queue_name: &QueueName) -> Result<(), Status> {
+        info!("removing queue");
+        let mut queues_write = self.queues.write().map_err(|e| {
+            error!(error=%e, "queues are unavailable");
+            Status::unavailable("queues are unavailable")
+        })?;
+
+        if queues_write.remove(queue_name).is_none() {
+            warn!("queue does not exist");
+            return Err(Status::not_found("queue does not exist"));
+        }
+
+        info!("queue removed");
         Ok(())
     }
 
@@ -101,6 +118,11 @@ impl RuusterQueues {
         exchanges_write.insert(exchange_name.to_owned(), exchange_kind.create());
 
         info!("exchange added");
+        Ok(())
+    }
+
+    #[instrument(skip_all, fields(exchange_name=%exchange_name))]
+    pub fn remove_exchange(&self, exchange_name: &ExchangeName) -> Result<(), Status> {
         Ok(())
     }
 
@@ -148,6 +170,25 @@ impl RuusterQueues {
             .collect();
         info!("exchanges list gathered correctly");
         Ok(result)
+    }
+
+    #[instrument(skip_all, fields(exchange_name=%exchange_name, queue_name=%queue_name))]
+    pub fn unbind_queue_from_exchange(
+        &self,
+        queue_name: &QueueName,
+        exchange_name: &ExchangeName,
+        metadata: Option<&protos::BindMetadata>,
+    ) -> Result<(), Status> {
+        let exchange = self.get_exchange(exchange_name)?;
+        let mut exchange_write = exchange.write().map_err(|e| {
+            error!(error=%e, "failed to accuire exchange lock for writting");
+            Status::unavailable("exchange is unavaiable")
+        })?;
+        exchange_write.unbind(queue_name, metadata).map_err(|e| {
+            error!(error=%e, "failed to unbind exchange");
+            Status::internal("failed to unbind exchange")
+        })?;
+        Ok(())
     }
 
     pub fn bind_queue_to_exchange(
@@ -389,7 +430,8 @@ impl RuusterQueues {
                         tokio::time::sleep(Duration::from_millis(100)).await;
                     }
                 }
-            }.instrument(span)
+            }
+            .instrument(span),
         );
         ReceiverStream::new(rx)
     }

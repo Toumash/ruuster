@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashMap};
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -9,15 +9,15 @@ type QueueName = String;
 type Queue = VecDeque<Message>;
 type QueueContainer = HashMap<QueueName, Mutex<Queue>>;
 
-struct FanoutExchange
-{
+struct FanoutExchange {
     bound_queues: Vec<QueueName>,
 }
 
-impl FanoutExchange
-{
+impl FanoutExchange {
     fn new() -> Self {
-        FanoutExchange { bound_queues: Vec::new() }
+        FanoutExchange {
+            bound_queues: Vec::new(),
+        }
     }
 
     fn bind_queue(&mut self, queue_name: String) {
@@ -26,13 +26,13 @@ impl FanoutExchange
 }
 
 struct Channel {
-    queues : Arc<RwLock<QueueContainer>>,
+    queues: Arc<RwLock<QueueContainer>>,
     exchange: Arc<RwLock<FanoutExchange>>, // this should be generic ofc
 }
 
 impl Channel {
     fn new() -> Self {
-        Channel { 
+        Channel {
             queues: Arc::new(RwLock::new(HashMap::new())),
             exchange: Arc::new(RwLock::new(FanoutExchange::new())),
         }
@@ -44,20 +44,22 @@ impl Channel {
         println!("Queue '{}' declared!", name);
     }
 
-    fn basic_consume(&self, queue_name: QueueName, on_message_callback: Callback) -> JoinHandle<()> {
+    fn basic_consume(
+        &self,
+        queue_name: QueueName,
+        on_message_callback: Callback,
+    ) -> JoinHandle<()> {
         let queues = self.queues.clone();
         let handle = thread::spawn(move || {
             loop {
                 let queues_read = queues.read().unwrap();
-                if let Some(queue) = queues_read.get(&queue_name){
+                if let Some(queue) = queues_read.get(&queue_name) {
                     let mut queue_write = queue.lock().unwrap();
-                    if let Some(message) = queue_write.pop_front()
-                    {
+                    if let Some(message) = queue_write.pop_front() {
                         drop(queue_write); // Explicitly drop lock before callback call to prevent dead-lock in case of time consuming callback
                         on_message_callback(message);
                     }
-                }
-                else {
+                } else {
                     println!("Queue '{}'", queue_name);
                 }
             }
@@ -65,7 +67,7 @@ impl Channel {
         handle
     }
 
-    fn bind_queue_to_exchange(&self, queue_name: QueueName) {
+    fn bind_queue(&self, queue_name: QueueName) {
         self.exchange.write().unwrap().bind_queue(queue_name);
     }
 
@@ -81,8 +83,7 @@ impl Channel {
     //     }
     // }
 
-    fn publish_to_exchange(&self, body: Message)
-    {
+    fn publish_to_exchange(&self, body: Message) {
         let exchange = self.exchange.read().unwrap();
         for queue_name in &exchange.bound_queues {
             if let Some(queue) = self.queues.read().unwrap().get(queue_name) {
@@ -93,7 +94,6 @@ impl Channel {
 }
 
 fn main() {
-
     let mut channel = Channel::new();
     let mut handles = vec![];
     let name1 = "queue1";
@@ -102,8 +102,8 @@ fn main() {
     channel.queue_declare(name1.into());
     channel.queue_declare(name2.into());
 
-    channel.bind_queue_to_exchange(name1.into());
-    channel.bind_queue_to_exchange(name2.into());
+    channel.bind_queue(name1.into());
+    channel.bind_queue(name2.into());
 
     handles.push(channel.basic_consume(name1.into(), |message| {
         println!("queue1 | message: {}", message);

@@ -1,5 +1,5 @@
 
-†
+²
 ruuster.protoruuster"
 Empty""
 
@@ -19,11 +19,21 @@ routingKey"f
 
 queue_name (	R	queueName"Q
 ExchangeDeclareRequest7
-exchange (2.ruuster.ExchangeDefinitionRexchange"D
+exchange (2.ruuster.ExchangeDefinitionRexchange"3
+RemoveQueueRequest
+
+queue_name (	R	queueName"<
+RemoveExchangeRequest#
+exchange_name (	RexchangeName"D
 BindMetadata4
 routing_key (2.ruuster.RoutingKeyR
 routingKey"„
 BindRequest1
+metadata (2.ruuster.BindMetadataRmetadata#
+exchange_name (	RexchangeName
+
+queue_name (	R	queueName"†
+UnbindRequest1
 metadata (2.ruuster.BindMetadataRmetadata#
 exchange_name (	RexchangeName
 
@@ -45,7 +55,7 @@ queue_name (	R	queueName
 AckRequest
 uuid (	Ruuid"-
 AckMessageBulkRequest
-uuids (	Ruuids2Ó
+uuids (	Ruuids2ƒ
 Ruuster<
 QueueDeclare.ruuster.QueueDeclareRequest.ruuster.EmptyB
 ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.Empty,
@@ -59,4 +69,7 @@ ListQueues.ruuster.Empty.ruuster.ListQueuesResponse?
 ConsumeOne.ruuster.ConsumeRequest.ruuster.Message1
 
 AckMessage.ruuster.AckRequest.ruuster.Empty@
-AckMessageBulk.ruuster.AckMessageBulkRequest.ruuster.Emptybproto3
+AckMessageBulk.ruuster.AckMessageBulkRequest.ruuster.Empty0
+Unbind.ruuster.UnbindRequest.ruuster.Empty:
+RemoveQueue.ruuster.RemoveQueueRequest.ruuster.Empty@
+RemoveExchange.ruuster.RemoveExchangeRequest.ruuster.Emptybproto3
