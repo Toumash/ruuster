@@ -17,8 +17,20 @@ cargo watch -x 'run --bin server'  --ignore protos/
 # to have watch on tests
 cargo watch -x 'test'  --ignore protos/
 ```
+
+# Docker demo
+
+```bash
+# pull the published image
+docker pull ghcr.io/toumash/ruuster:latest
+# run the server container
+docker run --rm -p 50051:50051 -e RUUSTER_SERVER_ADDR=0.0.0.0:50051 ghcr.io/toumash/ruuster:latest
+# run a demo client against the container
+cargo run --bin docker_demo -- --server-addr "http://127.0.0.1:50051"
+```
 ---
 # Ruuster workspace
+
 
 | Crate        | Description                                                       | 
 |--------------|:------------------------------------------------------------------|

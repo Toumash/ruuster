@@ -29,6 +29,10 @@ path = "./src/test_client/src/scenario_validator.rs"
 name = "scenario_builder"
 path = "./src/test_client/src/scenario_builder.rs"
 
+[[bin]]
+name = "docker_demo"
+path = "./src/test_client/src/docker_demo.rs"
+
 [dependencies]
 opentelemetry = { version = "0.23" }
 opentelemetry_sdk = { version = "0.23", features = ["rt-tokio"] }
