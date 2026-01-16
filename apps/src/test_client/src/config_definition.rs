@@ -1,5 +1,3 @@
-#![allow(dead_code)] // disable false-positive warnings
-
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
 

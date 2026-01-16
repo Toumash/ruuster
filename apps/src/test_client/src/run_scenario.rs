@@ -1,15 +1,12 @@
 use std::fmt::Display;
 
-use crate::config_definition::Metadata;
 use clap::Parser;
-use config_definition::ScenarioConfig;
 use std::process::{Child, Command};
+use test_client::conf_parser;
+use test_client::config_definition::{Metadata, ScenarioConfig};
 use thiserror::Error;
 use tracing::debug;
 use tracing_subscriber::EnvFilter;
-
-mod conf_parser;
-mod config_definition;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

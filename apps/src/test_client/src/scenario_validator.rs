@@ -1,9 +1,6 @@
 use clap::Parser;
-
+use test_client::conf_parser;
 use tracing::info;
-
-mod conf_parser;
-mod config_definition;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
