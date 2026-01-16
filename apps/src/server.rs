@@ -5,14 +5,15 @@ use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 use protos::ruuster_server::RuusterServer;
 use ruuster_grpc::RuusterQueuesGrpc;
 use std::fs;
+use std::net::SocketAddr;
 use tonic::transport::Server;
 use tracing::info;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::{filter, Layer, Registry};
 
-const SERVER_IP: &str = "127.0.0.1";
-const SERVER_PORT: &str = "50051";
+const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:50051";
+const SERVER_ADDR_ENV: &str = "RUUSTER_SERVER_ADDR";
 
 fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
     opentelemetry_otlp::new_pipeline()
@@ -31,6 +32,11 @@ fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
         .install_batch(runtime::Tokio)
 }
 
+fn resolve_server_addr() -> Result<SocketAddr, Box<dyn std::error::Error>> {
+    let addr = std::env::var(SERVER_ADDR_ENV).unwrap_or_else(|_| DEFAULT_SERVER_ADDR.to_string());
+    Ok(addr.parse()?)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tracer = init_tracer().expect("Failed to initialize tracer.");
@@ -47,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(stdout_log.with_filter(filter::LevelFilter::INFO));
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let addr = format!("{}:{}", SERVER_IP, SERVER_PORT).parse().unwrap();
+    let addr = resolve_server_addr()?;
     let ruuster_queue_service = RuusterQueuesGrpc::new();
     let current_dir = std::env::current_dir()?;
     let ruuster_descriptor_path = current_dir

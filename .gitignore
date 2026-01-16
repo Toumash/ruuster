@@ -22,3 +22,5 @@ run_test.sh
 .envrc
 shell.nix
 .direnv
+run_test.sh
+.DS_Store
