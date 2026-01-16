@@ -18,3 +18,7 @@ Cargo.lock
 
 *.png
 run_test.sh
+
+.envrc
+shell.nix
+.direnv

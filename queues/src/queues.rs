@@ -123,6 +123,15 @@ impl RuusterQueues {
 
     #[instrument(skip_all, fields(exchange_name=%exchange_name))]
     pub fn remove_exchange(&self, exchange_name: &ExchangeName) -> Result<(), Status> {
+        let mut exchanges_write = self.exchanges.write().map_err(|e| {
+            error!(error=%e, "exchanges are unavailable");
+            Status::unavailable("exchanges are unavailable")
+        })?;
+
+        if exchanges_write.remove(exchange_name).is_none() {
+            warn!("exchange does not exist");
+            return Err(Status::not_found("exchange does not exist"));
+        }
         Ok(())
     }
 
