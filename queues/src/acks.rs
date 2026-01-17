@@ -25,12 +25,24 @@ pub enum AckStatus {
     MessageAlreadyAcked,
 }
 
+/// Result of a nack operation containing the message to be requeued or sent to DLQ
+#[derive(Debug)]
+pub struct NackResult {
+    pub message: Message,
+    pub requeue: bool,
+}
+
 pub trait ApplyAck {
     fn apply_ack(&mut self, uuid: &UuidSerialized) -> Result<(), Status>;
     fn apply_bulk_ack(&mut self, uuids: &[UuidSerialized]) -> Result<(), Status>;
     fn clear_unused_record(&mut self, uuid: &UuidSerialized) -> Result<(), Status>;
     fn clear_all_unused_records(&mut self) -> Result<(), Status>;
     fn add_record(&mut self, message: Message, duration: Duration);
+    fn apply_nack(&mut self, uuid: &UuidSerialized, requeue: bool) -> Result<NackResult, Status>;
+    fn apply_bulk_nack(
+        &mut self,
+        nacks: &[(UuidSerialized, bool)],
+    ) -> Result<Vec<NackResult>, Status>;
 }
 
 impl ApplyAck for AckContainer {
@@ -87,6 +99,31 @@ impl ApplyAck for AckContainer {
         self.retain(|_, value| value.get_counter() > 0);
         Ok(())
     }
+
+    #[instrument(skip_all, fields(uuid=%uuid, requeue=%requeue))]
+    fn apply_nack(&mut self, uuid: &UuidSerialized, requeue: bool) -> Result<NackResult, Status> {
+        if let Some(record) = self.remove(uuid) {
+            let message = record.into_message();
+            info!("nack applied, message removed from ack container");
+            return Ok(NackResult { message, requeue });
+        }
+        warn!("ack record not found for nack");
+        Err(Status::not_found("ack record not found"))
+    }
+
+    #[instrument(skip_all, fields(nacks_count=nacks.len()))]
+    fn apply_bulk_nack(
+        &mut self,
+        nacks: &[(UuidSerialized, bool)],
+    ) -> Result<Vec<NackResult>, Status> {
+        let mut results = Vec::new();
+        for (uuid, requeue) in nacks {
+            if let Ok(result) = self.apply_nack(uuid, *requeue) {
+                results.push(result);
+            }
+        }
+        Ok(results)
+    }
 }
 
 impl AckRecord {
@@ -123,6 +160,10 @@ impl AckRecord {
     }
 
     pub fn apply_nack(&self) {}
+
+    pub fn into_message(self) -> Message {
+        self.message
+    }
 
     pub fn get_counter(&self) -> isize {
         self.counter

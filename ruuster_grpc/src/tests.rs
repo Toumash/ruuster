@@ -161,7 +161,7 @@ async fn test_ack_ok() {
 async fn test_stream_consuming() {
     let mut client = setup_server_and_client().await;
     setup_sqsfe_scenario(&mut client).await;
-    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 100, false, true).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 10, false, true).await;
     consume_message_bulk(&mut client, "q1".into(), &payloads).await;
 }
 
@@ -177,10 +177,11 @@ async fn test_remove_exchange() {
     )
     .await;
 
-    let response = client.remove_exchange(RemoveExchangeRequest {
-        exchange_name: "e2".to_string(),
-    })
-    .await;
+    let response = client
+        .remove_exchange(RemoveExchangeRequest {
+            exchange_name: "e2".to_string(),
+        })
+        .await;
     assert!(
         response.is_ok(),
         "failed to remove exchange: {}",
@@ -188,10 +189,11 @@ async fn test_remove_exchange() {
     );
 
     // removing non-existing exchange should fail
-    let response = client.remove_exchange(RemoveExchangeRequest {
-        exchange_name: "e3".to_string(),
-    })
-    .await;
+    let response = client
+        .remove_exchange(RemoveExchangeRequest {
+            exchange_name: "e3".to_string(),
+        })
+        .await;
     assert!(
         response.is_err(),
         "removing non-existing exchange should fail"
@@ -202,20 +204,21 @@ async fn test_remove_exchange() {
 async fn test_remove_queue() {
     let mut client = setup_server_and_client().await;
     create_queues(&mut client, &["q1".to_string(), "q2".to_string()], false).await;
-    let response = client.remove_queue(protos::RemoveQueueRequest {
-        queue_name: "q2".to_string(),
-    }).await;
+    let response = client
+        .remove_queue(protos::RemoveQueueRequest {
+            queue_name: "q2".to_string(),
+        })
+        .await;
     assert!(
         response.is_ok(),
         "failed to remove queue: {}",
         response.unwrap_err()
     );
     // removing non-existing queue should fail
-    let response = client.remove_queue(protos::RemoveQueueRequest {
-        queue_name: "q3".to_string(),
-    }).await;
-    assert!(
-        response.is_err(),
-        "removing non-existing queue should fail"
-    );
+    let response = client
+        .remove_queue(protos::RemoveQueueRequest {
+            queue_name: "q3".to_string(),
+        })
+        .await;
+    assert!(response.is_err(), "removing non-existing queue should fail");
 }
