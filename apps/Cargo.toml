@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "test_client"
+path = "./src/test_client/src/lib.rs"
+
 [[bin]]
 name = "server"
 path = "./src/server.rs"
@@ -32,6 +36,10 @@ path = "./src/test_client/src/scenario_builder.rs"
 [[bin]]
 name = "ruuster_chat"
 path = "./src/ruuster_chat/main.rs"
+
+[[bin]]
+name = "docker_demo"
+path = "./src/test_client/src/docker_demo.rs"
 
 [dependencies]
 opentelemetry = { version = "0.23" }

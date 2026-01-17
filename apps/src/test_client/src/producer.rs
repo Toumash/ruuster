@@ -2,10 +2,9 @@ use std::time::Duration;
 
 use clap::Parser;
 use protos::{ruuster_client::RuusterClient, ProduceRequest};
+use test_client::config_definition;
 use tonic::transport::Channel;
 use tracing::{error, info};
-
-mod config_definition;
 
 fn parse_metadata(config_metadata: &Option<String>) -> Option<protos::Metadata> {
     match config_metadata {

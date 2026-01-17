@@ -1,15 +1,13 @@
 use clap::Parser;
-use config_definition::ScenarioConfig;
 use protos::{
     ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition,
     QueueDeclareRequest,
 };
+use test_client::conf_parser;
+use test_client::config_definition::ScenarioConfig;
 use tonic::transport::Channel;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
-
-mod conf_parser;
-mod config_definition;
 
 struct ScenarioBuilder {
     config: ScenarioConfig,

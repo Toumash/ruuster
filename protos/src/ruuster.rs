@@ -46,6 +46,18 @@ pub struct ExchangeDeclareRequest {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RemoveQueueRequest {
+    #[prost(string, tag = "1")]
+    pub queue_name: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct RemoveExchangeRequest {
+    #[prost(string, tag = "1")]
+    pub exchange_name: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BindMetadata {
     #[prost(message, optional, tag = "1")]
     pub routing_key: ::core::option::Option<RoutingKey>,
@@ -53,6 +65,16 @@ pub struct BindMetadata {
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct BindRequest {
+    #[prost(message, optional, tag = "1")]
+    pub metadata: ::core::option::Option<BindMetadata>,
+    #[prost(string, tag = "2")]
+    pub exchange_name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub queue_name: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct UnbindRequest {
     #[prost(message, optional, tag = "1")]
     pub metadata: ::core::option::Option<BindMetadata>,
     #[prost(string, tag = "2")]
@@ -410,6 +432,69 @@ pub mod ruuster_client {
                 .insert(GrpcMethod::new("ruuster.Ruuster", "AckMessageBulk"));
             self.inner.unary(req, path, codec).await
         }
+        pub async fn unbind(
+            &mut self,
+            request: impl tonic::IntoRequest<super::UnbindRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static("/ruuster.Ruuster/Unbind");
+            let mut req = request.into_request();
+            req.extensions_mut().insert(GrpcMethod::new("ruuster.Ruuster", "Unbind"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn remove_queue(
+            &mut self,
+            request: impl tonic::IntoRequest<super::RemoveQueueRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/ruuster.Ruuster/RemoveQueue",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("ruuster.Ruuster", "RemoveQueue"));
+            self.inner.unary(req, path, codec).await
+        }
+        pub async fn remove_exchange(
+            &mut self,
+            request: impl tonic::IntoRequest<super::RemoveExchangeRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::new(
+                        tonic::Code::Unknown,
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/ruuster.Ruuster/RemoveExchange",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("ruuster.Ruuster", "RemoveExchange"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -473,6 +558,18 @@ pub mod ruuster_server {
         async fn ack_message_bulk(
             &self,
             request: tonic::Request<super::AckMessageBulkRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
+        async fn unbind(
+            &self,
+            request: tonic::Request<super::UnbindRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
+        async fn remove_queue(
+            &self,
+            request: tonic::Request<super::RemoveQueueRequest>,
+        ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
+        async fn remove_exchange(
+            &self,
+            request: tonic::Request<super::RemoveExchangeRequest>,
         ) -> std::result::Result<tonic::Response<super::Empty>, tonic::Status>;
     }
     #[derive(Debug)]
@@ -988,6 +1085,142 @@ pub mod ruuster_server {
                     let fut = async move {
                         let inner = inner.0;
                         let method = AckMessageBulkSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/ruuster.Ruuster/Unbind" => {
+                    #[allow(non_camel_case_types)]
+                    struct UnbindSvc<T: Ruuster>(pub Arc<T>);
+                    impl<T: Ruuster> tonic::server::UnaryService<super::UnbindRequest>
+                    for UnbindSvc<T> {
+                        type Response = super::Empty;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::UnbindRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ruuster>::unbind(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = UnbindSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/ruuster.Ruuster/RemoveQueue" => {
+                    #[allow(non_camel_case_types)]
+                    struct RemoveQueueSvc<T: Ruuster>(pub Arc<T>);
+                    impl<
+                        T: Ruuster,
+                    > tonic::server::UnaryService<super::RemoveQueueRequest>
+                    for RemoveQueueSvc<T> {
+                        type Response = super::Empty;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::RemoveQueueRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ruuster>::remove_queue(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = RemoveQueueSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/ruuster.Ruuster/RemoveExchange" => {
+                    #[allow(non_camel_case_types)]
+                    struct RemoveExchangeSvc<T: Ruuster>(pub Arc<T>);
+                    impl<
+                        T: Ruuster,
+                    > tonic::server::UnaryService<super::RemoveExchangeRequest>
+                    for RemoveExchangeSvc<T> {
+                        type Response = super::Empty;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::RemoveExchangeRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as Ruuster>::remove_exchange(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let inner = inner.0;
+                        let method = RemoveExchangeSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

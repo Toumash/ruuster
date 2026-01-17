@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::{fmt, path::Path};
 
-use crate::config_definition::ScenarioConfig;
+use super::config_definition::ScenarioConfig;
 
 #[derive(Debug)]
 enum ArgsValidationError {
