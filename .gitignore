@@ -18,3 +18,4 @@ Cargo.lock
 
 *.png
 run_test.sh
+.DS_Store

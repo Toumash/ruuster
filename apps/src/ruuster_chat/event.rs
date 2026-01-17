@@ -6,11 +6,12 @@ use futures::{FutureExt, StreamExt};
 use tokio::sync::mpsc;
 
 /// Terminal events.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Event {
     Tick,
     Key(KeyEvent),
     Resize(u16, u16),
+    ChatEvent(crate::update::ChatEvent),
 }
 
 /// Terminal event handler.
@@ -18,7 +19,7 @@ pub enum Event {
 #[derive(Debug)]
 pub struct EventHandler {
     /// Event sender channel.
-    sender: mpsc::UnboundedSender<Event>,
+    pub sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
     /// Event handler thread.
@@ -33,8 +34,8 @@ impl EventHandler {
         let _sender = sender.clone();
         let handler = tokio::spawn(async move {
             let mut tick = tokio::time::interval(tick_rate);
+            let mut reader = crossterm::event::EventStream::new();
             loop {
-                let mut reader = crossterm::event::EventStream::new();
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
@@ -42,22 +43,20 @@ impl EventHandler {
                         break;
                     }
                     _ = tick_delay => {
-                        _sender.send(Event::Tick).unwrap();
+                        let _ = _sender.send(Event::Tick);
                     }
                     Some(Ok(evt)) = crossterm_event => {
                         match evt {
-                            CrosstermEvent::FocusGained => {break;},
-                            CrosstermEvent::FocusLost => {break;},
                             CrosstermEvent::Key(key) => {
                                 if key.kind == crossterm::event::KeyEventKind::Press {
-                                    _sender.send(Event::Key(key)).unwrap();
+                                    let _ = _sender.send(Event::Key(key));
                                 }
                             },
-                            CrosstermEvent::Mouse(_) => {break;},
-                            CrosstermEvent::Paste(_) => {break;},
                             CrosstermEvent::Resize(x, y) => {
-                                _sender.send(Event::Resize(x, y)).unwrap();
+                                let _ = _sender.send(Event::Resize(x, y));
                             },
+                            // Ignore other events but don't break
+                            _ => {},
                         }
                     }
                 }

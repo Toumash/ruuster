@@ -1,11 +1,13 @@
 use exchanges::ExchangeKind;
 use protos::{
-    ruuster_client::RuusterClient, BindRequest, ExchangeDeclareRequest, ExchangeDefinition,
-    ProduceRequest, QueueDeclareRequest,
+    ruuster_client::RuusterClient, BindRequest, ConsumeRequest, ExchangeDeclareRequest,
+    ExchangeDefinition, ProduceRequest, QueueDeclareRequest,
 };
 use std::fmt::Display;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tonic::transport::Channel;
+use tonic::Streaming;
 
 use crate::model::*;
 
@@ -22,7 +24,7 @@ impl Display for ChatRuusterClientError {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ChatClient {
     client: Option<RuusterClient<Channel>>,
 }
@@ -41,6 +43,7 @@ impl ChatClient {
         self.client = None;
     }
 
+    /// Creates a room (exchange). Ignores "already exists" errors.
     pub async fn create_room(&mut self, room_id: RoomId) -> Result<(), Box<dyn std::error::Error>> {
         let create_exchange_request = ExchangeDeclareRequest {
             exchange: Some(ExchangeDefinition {
@@ -52,7 +55,9 @@ impl ChatClient {
             .client
             .as_mut()
             .ok_or_else(|| ChatRuusterClientError::Disconnected)?;
-        client.exchange_declare(create_exchange_request).await?;
+
+        // Ignore "already exists" error - room may have been created by another user
+        let _ = client.exchange_declare(create_exchange_request).await;
         Ok(())
     }
 
@@ -60,22 +65,62 @@ impl ChatClient {
         &mut self,
         room_id: RoomId,
         nick: Nick,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<Streaming<protos::Message>, Box<dyn std::error::Error>> {
+        // Create user queue
         let create_queue_request = QueueDeclareRequest {
             queue_name: nick.clone(),
-        };
-        let bind_request = BindRequest {
-            metadata: None,
-            exchange_name: room_id,
-            queue_name: nick,
         };
 
         let client = self
             .client
             .as_mut()
             .ok_or_else(|| ChatRuusterClientError::Disconnected)?;
-        client.queue_declare(create_queue_request).await?;
+
+        // We ignore error here as queue might already exist
+        let _ = client.queue_declare(create_queue_request).await;
+
+        // Bind user queue to room exchange
+        let bind_request = BindRequest {
+            metadata: None,
+            exchange_name: room_id.clone(),
+            queue_name: nick.clone(),
+        };
         client.bind(bind_request).await?;
+
+        // Start consuming
+        let consume_request = ConsumeRequest {
+            queue_name: nick,
+            auto_ack: true,
+        };
+
+        let response = client.consume_bulk(consume_request).await?;
+        Ok(response.into_inner())
+    }
+
+    pub async fn exit_room(
+        &mut self,
+        room_id: RoomId,
+        nick: Nick,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let client = self
+            .client
+            .as_mut()
+            .ok_or_else(|| ChatRuusterClientError::Disconnected)?;
+
+        // Unbind and remove queue are not supported in the current protos
+        /*
+        let unbind_request = UnbindRequest {
+            metadata: None,
+            exchange_name: room_id,
+            queue_name: nick.clone(),
+        };
+        let _ = client.unbind(unbind_request).await;
+
+        let remove_queue_request = RemoveQueueRequest {
+            queue_name: nick,
+        };
+        let _ = client.remove_queue(remove_queue_request).await;
+        */
 
         Ok(())
     }

@@ -1,15 +1,16 @@
 use crate::ruuster::ChatClient;
+use crate::update::ChatEvent;
 use serde_derive::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
-pub type ServerAddr  = String;
-pub type RoomId      = String;
-pub type Nick        = String;
+pub type ServerAddr = String;
+pub type RoomId = String;
+pub type Nick = String;
 
-
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
-    sender: Nick,
-    payload: String
+    pub sender: Nick,
+    pub payload: String,
 }
 
 #[derive(Debug, Default)]
@@ -21,6 +22,14 @@ pub struct Model {
     pub user_nick: Option<Nick>,
     pub messages: Vec<ChatMessage>,
     pub chat_client: ChatClient,
+    pub input: String,
+    pub event_sender: Option<mpsc::UnboundedSender<crate::event::Event>>,
+}
+
+impl Model {
+    pub fn new() -> Self {
+        Model::default()
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -28,7 +37,6 @@ pub enum RunningState {
     #[default]
     StartView, // connecting to server
     RoomListView, // creating and connecting to room
-    ChatView, // sending messages
+    ChatView,     // sending messages
     Done,
 }
-

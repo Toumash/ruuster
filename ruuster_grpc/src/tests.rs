@@ -160,7 +160,6 @@ async fn test_ack_ok() {
 async fn test_stream_consuming() {
     let mut client = setup_server_and_client().await;
     setup_sqsfe_scenario(&mut client).await;
-    let payloads =
-        produce_n_random_messages(&mut client, "e1".to_string(), 100, false, true).await;
+    let payloads = produce_n_random_messages(&mut client, "e1".to_string(), 100, false, true).await;
     consume_message_bulk(&mut client, "q1".into(), &payloads).await;
 }
