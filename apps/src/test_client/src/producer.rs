@@ -18,9 +18,11 @@ fn parse_metadata(config_metadata: &Option<String>) -> Option<protos::Metadata> 
                 }
             };
             Some(protos::Metadata {
-                routing_key: Some(protos::RoutingKey{ value: meta_parsed.routing_key.clone()})
+                routing_key: Some(protos::RoutingKey {
+                    value: meta_parsed.routing_key.clone(),
+                }),
             })
-        },
+        }
     }
 }
 
@@ -76,7 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let subscriber = tracing_subscriber::fmt().compact().finish();
     tracing::subscriber::set_global_default(subscriber).expect("failed to setup producer logs");
-    
+
     let args = Args::parse();
 
     let mut client = RuusterClient::connect(args.server_addr.clone())

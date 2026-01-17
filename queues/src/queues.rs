@@ -323,6 +323,116 @@ impl RuusterQueues {
         Ok(())
     }
 
+    /// Nack a single message - either requeue it or send to dead letter queue
+    #[instrument(skip_all, fields(uuid = %uuid, requeue = %requeue))]
+    pub fn apply_message_nack(&self, uuid: UuidSerialized, requeue: bool) -> Result<(), Status> {
+        info!("started single message nack");
+        let mut acks = self.get_acks()?;
+
+        let nack_result = acks.apply_nack(&uuid, requeue)?;
+
+        if nack_result.requeue {
+            // Requeue: put message back to original queue
+            self.requeue_message(nack_result.message)?;
+        } else {
+            // Send to dead letter queue
+            self.send_to_dead_letter_queue(nack_result.message)?;
+        }
+
+        info!("nack completed");
+        Ok(())
+    }
+
+    /// Nack multiple messages
+    #[instrument(skip_all)]
+    pub fn apply_message_bulk_nack(&self, nacks: &[(UuidSerialized, bool)]) -> Result<(), Status> {
+        info!("nacking multiple messages");
+        let mut acks = self.get_acks()?;
+
+        let nack_results = acks.apply_bulk_nack(nacks)?;
+
+        // Release acks lock before doing queue operations
+        drop(acks);
+
+        for nack_result in nack_results {
+            if nack_result.requeue {
+                self.requeue_message(nack_result.message)?;
+            } else {
+                self.send_to_dead_letter_queue(nack_result.message)?;
+            }
+        }
+
+        info!("bulk nack completed");
+        Ok(())
+    }
+
+    /// Requeue a message to the front of its original queue (if known) or a default queue
+    #[instrument(skip_all, fields(uuid = %message.uuid))]
+    fn requeue_message(&self, message: Message) -> Result<(), Status> {
+        // Try to get original queue from dead letter metadata, or use a fallback
+        let queue_name = message
+            .metadata
+            .as_ref()
+            .and_then(|m| m.dead_letter.as_ref())
+            .and_then(|dl| dl.queue.clone())
+            .unwrap_or_else(|| "_requeue".to_string());
+
+        info!(queue_name = %queue_name, "requeuing message");
+
+        // Ensure the queue exists
+        let _ = self.add_queue(&queue_name);
+
+        let queue = self.get_queue(&queue_name)?;
+        let mut queue_guard = queue.lock().map_err(|e| {
+            error!(error=%e, "queue is unavailable");
+            Status::unavailable("queue is unavailable")
+        })?;
+
+        // Push to the front so it's processed first
+        queue_guard.push_front(message);
+        info!("message requeued successfully");
+        Ok(())
+    }
+
+    /// Send a message to the dead letter queue
+    #[instrument(skip_all, fields(uuid = %message.uuid))]
+    fn send_to_dead_letter_queue(&self, mut message: Message) -> Result<(), Status> {
+        const DEADLETTER_QUEUE_NAME: &str = "_deadletter";
+
+        info!("sending message to dead letter queue");
+
+        // Ensure the dead letter queue exists
+        let _ = self.add_queue(&DEADLETTER_QUEUE_NAME.to_string());
+
+        // Update dead letter metadata
+        let dead_letter_metadata = message
+            .metadata
+            .get_or_insert_with(|| Metadata {
+                created_at: Some(Instant::now()),
+                routing_key: None,
+                dead_letter: None,
+            })
+            .dead_letter
+            .get_or_insert(internals::DeadLetterMetadata {
+                count: Some(0),
+                exchange: None,
+                queue: None,
+            });
+
+        // Increment the dead letter count
+        dead_letter_metadata.count = Some(dead_letter_metadata.count.unwrap_or(0) + 1);
+
+        let queue = self.get_queue(&DEADLETTER_QUEUE_NAME.to_string())?;
+        let mut queue_guard = queue.lock().map_err(|e| {
+            error!(error=%e, "dead letter queue is unavailable");
+            Status::unavailable("dead letter queue is unavailable")
+        })?;
+
+        queue_guard.push_back(message);
+        info!("message sent to dead letter queue");
+        Ok(())
+    }
+
     #[instrument(skip_all, fields(uuid=%message.uuid, duration=?duration))]
     fn track_message_delivery(
         acks: &mut AckContainer,
