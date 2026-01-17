@@ -1,5 +1,5 @@
 
-²
+®
 ruuster.protoruuster"
 Empty""
 
@@ -55,7 +55,12 @@ queue_name (	R	queueName
 AckRequest
 uuid (	Ruuid"-
 AckMessageBulkRequest
-uuids (	Ruuids2ƒ
+uuids (	Ruuids";
+NackRequest
+uuid (	Ruuid
+requeue (Rrequeue"D
+NackMessageBulkRequest*
+nacks (2.ruuster.NackRequestRnacks2ü
 Ruuster<
 QueueDeclare.ruuster.QueueDeclareRequest.ruuster.EmptyB
 ExchangeDeclare.ruuster.ExchangeDeclareRequest.ruuster.Empty,
@@ -69,7 +74,9 @@ ListQueues.ruuster.Empty.ruuster.ListQueuesResponse?
 ConsumeOne.ruuster.ConsumeRequest.ruuster.Message1
 
 AckMessage.ruuster.AckRequest.ruuster.Empty@
-AckMessageBulk.ruuster.AckMessageBulkRequest.ruuster.Empty0
+AckMessageBulk.ruuster.AckMessageBulkRequest.ruuster.Empty3
+NackMessage.ruuster.NackRequest.ruuster.EmptyB
+NackMessageBulk.ruuster.NackMessageBulkRequest.ruuster.Empty0
 Unbind.ruuster.UnbindRequest.ruuster.Empty:
 RemoveQueue.ruuster.RemoveQueueRequest.ruuster.Empty@
 RemoveExchange.ruuster.RemoveExchangeRequest.ruuster.Emptybproto3

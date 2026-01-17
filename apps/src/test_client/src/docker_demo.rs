@@ -123,8 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_var("RUST_LOG", "info");
     }
     let subscriber = tracing_subscriber::fmt().compact().finish();
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("failed to setup docker demo logs");
+    tracing::subscriber::set_global_default(subscriber).expect("failed to setup docker demo logs");
 
     let args = Args::parse();
     let mut client = RuusterClient::connect(args.server_addr.clone())

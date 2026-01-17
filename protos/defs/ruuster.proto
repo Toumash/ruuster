@@ -12,6 +12,8 @@ service Ruuster {
     rpc ConsumeOne(ConsumeRequest) returns (Message);
     rpc AckMessage(AckRequest) returns (Empty);
     rpc AckMessageBulk(AckMessageBulkRequest) returns (Empty);
+    rpc NackMessage(NackRequest) returns (Empty);
+    rpc NackMessageBulk(NackMessageBulkRequest) returns (Empty);
     rpc Unbind(UnbindRequest) returns (Empty);
     rpc RemoveQueue(RemoveQueueRequest) returns (Empty);
     rpc RemoveExchange(RemoveExchangeRequest) returns (Empty);
@@ -100,4 +102,13 @@ message AckRequest
 
 message AckMessageBulkRequest {
     repeated string uuids = 1;
+}
+
+message NackRequest {
+    string uuid = 1;
+    bool requeue = 2;  // true = requeue to original queue, false = send to DLQ
+}
+
+message NackMessageBulkRequest {
+    repeated NackRequest nacks = 1;
 }

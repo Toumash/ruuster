@@ -1,7 +1,8 @@
 use protos::{
     ruuster, AckMessageBulkRequest, AckRequest, BindRequest, ConsumeRequest, Empty,
-    ExchangeDeclareRequest, ListExchangesResponse, ListQueuesResponse, ProduceRequest,
-    QueueDeclareRequest, RemoveExchangeRequest, RemoveQueueRequest, RoutingKey, UnbindRequest,
+    ExchangeDeclareRequest, ListExchangesResponse, ListQueuesResponse, NackMessageBulkRequest,
+    NackRequest, ProduceRequest, QueueDeclareRequest, RemoveExchangeRequest, RemoveQueueRequest,
+    RoutingKey, UnbindRequest,
 };
 use queues::queues::RuusterQueues;
 
@@ -167,6 +168,31 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
         self.0.apply_message_bulk_ack(&request.uuids)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    #[instrument(skip_all, fields(request=?request))]
+    async fn nack_message(
+        &self,
+        request: tonic::Request<NackRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        self.0.apply_message_nack(request.uuid, request.requeue)?;
+        Ok(Response::new(Empty {}))
+    }
+
+    #[instrument(skip_all, fields(request=?request))]
+    async fn nack_message_bulk(
+        &self,
+        request: tonic::Request<NackMessageBulkRequest>,
+    ) -> Result<Response<Empty>, Status> {
+        let request = request.into_inner();
+        let nacks: Vec<(String, bool)> = request
+            .nacks
+            .into_iter()
+            .map(|n| (n.uuid, n.requeue))
+            .collect();
+        self.0.apply_message_bulk_nack(&nacks)?;
         Ok(Response::new(Empty {}))
     }
 

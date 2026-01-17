@@ -1,12 +1,10 @@
+use crate::Message;
 use crate::Metadata;
 use crate::RoutingKey;
-use crate::Message;
 
 impl From<String> for RoutingKey {
     fn from(value: String) -> Self {
-        Self {
-            value,
-        }
+        Self { value }
     }
 }
 
