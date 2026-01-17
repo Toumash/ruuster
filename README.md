@@ -42,4 +42,8 @@ cargo run --bin docker_demo -- --server-addr "http://127.0.0.1:50051"
 | utils        | library with common utilities                                     |
 | apps         | crate containing binaries built using our project                 |
 
+# NixOs
+To develop on NixOs you need to have `direnv` installed and enabled.
+Then just run `direnv allow` in the project root and it will automatically load the nix shell with all dependencies.
+
 
