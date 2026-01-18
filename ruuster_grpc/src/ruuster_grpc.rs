@@ -1,8 +1,8 @@
 use protos::{
     ruuster, AckMessageBulkRequest, AckRequest, BindRequest, ConsumeRequest, Empty,
-    ExchangeDeclareRequest, ListExchangesResponse, ListQueuesResponse, NackMessageBulkRequest,
-    NackRequest, ProduceRequest, QueueDeclareRequest, RemoveExchangeRequest, RemoveQueueRequest,
-    RoutingKey, UnbindRequest,
+    ExchangeDeclareRequest, ListExchangesResponse, ListQueuesResponse, ProduceRequest,
+    QueueDeclareRequest, RemoveExchangeRequest, RemoveQueueRequest, UnbindRequest,
+    NackMessageBulkRequest, NackRequest,
 };
 use queues::queues::RuusterQueues;
 
@@ -122,17 +122,8 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         let message = self
             .0
             .consume_message(&request.queue_name, request.auto_ack)?;
-        let msg = protos::Message {
-            metadata: match message.metadata {
-                Some(m) => m.routing_key.map(|rk| protos::Metadata {
-                    routing_key: Some(RoutingKey { value: rk }),
-                }),
-                None => None,
-            },
-            payload: message.payload,
-            uuid: message.uuid,
-        };
-        Ok(Response::new(msg))
+        let proto_message = protos::Message::from(message);
+        Ok(Response::new(proto_message))
     }
 
     #[instrument(skip_all, fields(request=?request))]
@@ -141,11 +132,7 @@ impl ruuster::ruuster_server::Ruuster for RuusterQueuesGrpc {
         request: tonic::Request<ProduceRequest>,
     ) -> Result<Response<Empty>, Status> {
         let request = request.into_inner();
-        let metadata = Some(internals::Metadata {
-            created_at: None,
-            dead_letter: None,
-            routing_key: request.metadata.map(|m| m.routing_key.unwrap().value),
-        });
+        let metadata: Option<internals::Metadata> = request.metadata.map(|m| m.into());
         self.0
             .forward_message(request.payload, &request.exchange_name, metadata)?;
         Ok(Response::new(Empty {}))

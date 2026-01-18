@@ -49,6 +49,7 @@ impl ChatClient {
                 kind: ExchangeKind::Fanout.into(),
                 exchange_name: room_id,
             }),
+            durable: false,
         };
         let client = self
             .client
@@ -68,6 +69,7 @@ impl ChatClient {
         // Create user queue
         let create_queue_request = QueueDeclareRequest {
             queue_name: nick.clone(),
+            durable: false,
         };
 
         let client = self
@@ -83,6 +85,7 @@ impl ChatClient {
             metadata: None,
             exchange_name: room_id.clone(),
             queue_name: nick.clone(),
+            durable: false,
         };
         client.bind(bind_request).await?;
 

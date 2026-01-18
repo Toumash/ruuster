@@ -18,9 +18,10 @@ fn parse_metadata(config_metadata: &Option<String>) -> Option<protos::Metadata> 
                 }
             };
             Some(protos::Metadata {
-                routing_key: Some(protos::RoutingKey {
-                    value: meta_parsed.routing_key.clone(),
-                }),
+                routing_key: Some(protos::RoutingKey{ value: meta_parsed.routing_key.clone()}),
+                persistent: false,
+                created_at: utils::current_time_duration().as_millis() as i64,
+                dead_letter: None,
             })
         }
     }

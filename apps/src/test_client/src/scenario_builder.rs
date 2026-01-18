@@ -40,6 +40,7 @@ impl ScenarioBuilder {
             self.client
                 .queue_declare(QueueDeclareRequest {
                     queue_name: queue.name.to_owned(),
+                    durable: false,
                 })
                 .await?;
             info!("added queue: {}", queue.name);
@@ -57,6 +58,7 @@ impl ScenarioBuilder {
                         exchange_name: exchange.name.to_owned(),
                         kind: exchange.kind,
                     }),
+                    durable: false,
                 })
                 .await?;
             info!(echange_name=%exchange.name ,"added exchange");
@@ -80,6 +82,7 @@ impl ScenarioBuilder {
                         metadata: bind_metadata,
                         exchange_name: exchange_name.clone(),
                         queue_name: bind.queue_name.to_owned(),
+                        durable: false,
                     })
                     .await?;
                 info!(exchange_name=%exchange_name, queue_name=%bind.queue_name, "added bind");

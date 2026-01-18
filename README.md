@@ -1,6 +1,6 @@
 # Ruuster
-> rabbitmq & kafka killer 🐰💥🔫 
-
+>
+> rabbitmq & kafka killer 🐰💥🔫
 
 # Setup
 
@@ -8,7 +8,7 @@ To run you can use GitPod (super fast), devcontainers (local docker + vscode) or
 
 1. Clone the repo
 1. Open in vscode
-1. Run `docker compose up -d` to start logs/traces collector UI: http://localhost:16686
+1. Run `docker compose up -d` to start logs/traces collector UI: <http://localhost:16686>
 1. Build & run in the terminal
 
 ```bash
@@ -28,35 +28,37 @@ docker run --rm -p 50051:50051 -e RUUSTER_SERVER_ADDR=0.0.0.0:50051 ghcr.io/toum
 # run a demo client against the container
 cargo run --bin docker_demo -- --server-addr "http://127.0.0.1:50051"
 ```
+
 ---
+
 # Ruuster workspace
 
-
-| Crate        | Description                                                       | 
+| Crate        | Description                                                       |
 |--------------|:------------------------------------------------------------------|
 | queues       | core ruuster functionalities (queues, acks)                       |
 | internals    | declarations of internal types used by ruuster                    |
-| exchanges    | library defining exchangers behavior / logic of message trasport  | 
+| exchanges    | library defining exchangers behavior / logic of message trasport  |
 | protos       | library with definitions of gRPC services (proto files)           |
 | ruuster-qrpc | library containing implementation of gRPC server                  |
 | utils        | library with common utilities                                     |
 | apps         | crate containing binaries built using our project                 |
 
 # NixOs
+
 To develop on NixOs you need to have `direnv` installed and enabled.
 Then just run `direnv allow` in the project root and it will automatically load the nix shell with all dependencies.
 
 Also in user settings json you need those entries:
 
-```
-    "rust-analyzer.rustcSource": "discover",
-    "rust-analyzer.cargo.allFeatures": true,
-    "rust-analyzer.checkOnSave.command": "clippy"
+```json
+  "rust-analyzer.rustcSource": "discover",
+  "rust-analyzer.cargo.allFeatures": true,
+  "rust-analyzer.checkOnSave.command": "clippy"
 ```
 
-In order to use CodeLLDB in VSCode on NixOS, use this configuration for vscode in pkgs: 
+In order to use CodeLLDB in VSCode on NixOS, use this configuration for vscode in pkgs:
 
-```
+```nix
   environment.systemPackages = with pkgs; [
     # your other packages
 
@@ -70,8 +72,5 @@ In order to use CodeLLDB in VSCode on NixOS, use this configuration for vscode i
           --add-flags "--extensions-dir ~/.vscode-fhs-extensions"
       '';
     })
-
   ];
 ```
-
-

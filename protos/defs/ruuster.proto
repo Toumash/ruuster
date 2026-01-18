@@ -25,8 +25,17 @@ message RoutingKey {
     string value = 1;
 }
 
+message DeadLetterMetadata {
+    int64 count = 1;
+    string exchange = 2;
+    string queue = 3;
+}
+
 message Metadata {
     RoutingKey routing_key = 1;
+    int64 created_at = 2;
+    DeadLetterMetadata dead_letter = 3;
+    bool persistent = 4;
 }
 
 message Message {
@@ -42,10 +51,12 @@ message ExchangeDefinition {
 
 message QueueDeclareRequest {
     string queue_name = 1;
+    bool durable = 2;
 }
 
 message ExchangeDeclareRequest {
     ExchangeDefinition exchange = 1;
+    bool durable = 2;
 }
 
 message RemoveQueueRequest {
@@ -64,6 +75,7 @@ message BindRequest {
     BindMetadata metadata = 1;
     string exchange_name = 2;
     string queue_name = 3;
+    bool durable = 4;
 }
 
 message UnbindRequest {

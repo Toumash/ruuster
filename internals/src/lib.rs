@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::time::Duration;
 
 #[derive(Clone, PartialEq, Default, Debug)]
 pub struct Message {
@@ -10,13 +10,14 @@ pub struct Message {
 #[derive(Clone, PartialEq, Debug)]
 pub struct Metadata {
     pub routing_key: Option<String>,
-    pub created_at: Option<Instant>,
+    pub created_at: Duration, // since UNIX_EPOCH
     pub dead_letter: Option<DeadLetterMetadata>,
+    pub persistent: bool,
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct DeadLetterMetadata {
-    pub count: Option<i64>,
-    pub exchange: Option<String>,
-    pub queue: Option<String>,
+    pub count: i64,
+    pub exchange: String,
+    pub queue: String,
 }

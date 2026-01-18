@@ -1,13 +1,13 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{self, Display};
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
 
 use internals::{DeadLetterMetadata, Message, Metadata};
 use serde::{Deserialize, Serialize};
 
 use tracing::{debug, error, info, warn};
 use types::{DirectExchange, FanoutExchange};
+use utils::current_time_duration;
 
 pub mod types;
 
@@ -164,14 +164,15 @@ pub(crate) trait PushToQueueStrategy {
                     message.uuid
                 );
                 let mut meta = message.metadata.unwrap_or(Metadata {
-                    created_at: Some(Instant::now()),
+                    created_at: current_time_duration(),
                     routing_key: None,
                     dead_letter: None,
+                    persistent: false,
                 });
                 let deadletter_metadata = DeadLetterMetadata {
-                    count: Some(1),
-                    exchange: Some(exchange_name.to_string()),
-                    queue: Some(name.to_string()),
+                    count: 1,
+                    exchange: exchange_name.to_string(),
+                    queue: name.to_string(),
                 };
                 meta.dead_letter = Some(deadletter_metadata);
 
@@ -196,6 +197,7 @@ pub(crate) trait PushToQueueStrategy {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize)]
 struct DeadLetterMessage {
     count: i32,

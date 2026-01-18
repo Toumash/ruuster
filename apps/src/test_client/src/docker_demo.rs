@@ -32,6 +32,7 @@ async fn declare_queue(
     if let Err(err) = client
         .queue_declare(QueueDeclareRequest {
             queue_name: queue_name.to_string(),
+            durable: false,
         })
         .await
     {
@@ -50,6 +51,7 @@ async fn declare_exchange(
                 kind: FANOUT_KIND,
                 exchange_name: exchange_name.to_string(),
             }),
+            durable: false,
         })
         .await
     {
@@ -68,6 +70,7 @@ async fn bind_queue(
             exchange_name: exchange_name.to_string(),
             queue_name: queue_name.to_string(),
             metadata: None,
+            durable: false,
         })
         .await
     {

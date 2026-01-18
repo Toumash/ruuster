@@ -10,9 +10,25 @@ pub struct RoutingKey {
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
+pub struct DeadLetterMetadata {
+    #[prost(int64, tag = "1")]
+    pub count: i64,
+    #[prost(string, tag = "2")]
+    pub exchange: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub queue: ::prost::alloc::string::String,
+}
+#[allow(clippy::derive_partial_eq_without_eq)]
+#[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Metadata {
     #[prost(message, optional, tag = "1")]
     pub routing_key: ::core::option::Option<RoutingKey>,
+    #[prost(int64, tag = "2")]
+    pub created_at: i64,
+    #[prost(message, optional, tag = "3")]
+    pub dead_letter: ::core::option::Option<DeadLetterMetadata>,
+    #[prost(bool, tag = "4")]
+    pub persistent: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -37,12 +53,16 @@ pub struct ExchangeDefinition {
 pub struct QueueDeclareRequest {
     #[prost(string, tag = "1")]
     pub queue_name: ::prost::alloc::string::String,
+    #[prost(bool, tag = "2")]
+    pub durable: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ExchangeDeclareRequest {
     #[prost(message, optional, tag = "1")]
     pub exchange: ::core::option::Option<ExchangeDefinition>,
+    #[prost(bool, tag = "2")]
+    pub durable: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -71,6 +91,8 @@ pub struct BindRequest {
     pub exchange_name: ::prost::alloc::string::String,
     #[prost(string, tag = "3")]
     pub queue_name: ::prost::alloc::string::String,
+    #[prost(bool, tag = "4")]
+    pub durable: bool,
 }
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

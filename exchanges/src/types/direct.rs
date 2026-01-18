@@ -330,8 +330,9 @@ mod tests {
             payload: "#abadcaffe".to_string(),
             metadata: Some(Metadata {
                 routing_key: Some("test_1".to_string()),
-                created_at: None,
+                created_at: current_time_duration(),
                 dead_letter: None,
+                persistent: false,
             }),
         };
 
@@ -343,8 +344,9 @@ mod tests {
             payload: "#abadcaffe".to_string(),
             metadata: Some(Metadata {
                 routing_key: Some("test_2".to_string()),
-                created_at: None,
+                created_at: current_time_duration(),
                 dead_letter: None,
+                persistent: false,
             }),
         };
 
@@ -363,8 +365,9 @@ mod tests {
         let mut ex = DirectExchange::new("fanout_test".into());
         let routing_metadata = Metadata {
             routing_key: Some("route_key".to_string()),
-            created_at: None,
+            created_at: current_time_duration(),
             dead_letter: None,
+            persistent: false,
         };
         let _ = ex.bind(
             &"q1".to_string(),
@@ -436,9 +439,10 @@ mod tests {
                         uuid: Uuid::new_v4().to_string(),
                         payload: "#abadcaffe".to_string(),
                         metadata: Some(Metadata {
-                            created_at: None,
+                            created_at: current_time_duration(),
                             dead_letter: None,
                             routing_key: Some("route_key".to_string()),
+                            persistent: false,
                         }),
                     },
                     queues.clone(),
@@ -450,9 +454,10 @@ mod tests {
             uuid: Uuid::new_v4().to_string(),
             payload: "#abadcaffe".to_string(),
             metadata: Some(Metadata {
-                created_at: None,
+                created_at: current_time_duration(),
                 dead_letter: None,
                 routing_key: Some("route_key".to_string()),
+                persistent: false,
             }),
         };
 

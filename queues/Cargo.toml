@@ -15,3 +15,4 @@ uuid = { version = "1.8.0", features = ["v4"] }
 protos = { path = "../protos" }
 exchanges = { path = "../exchanges" }
 internals = { path = "../internals" }
+utils = { path = "../utils" }

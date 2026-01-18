@@ -9,7 +9,9 @@ use uuid::Uuid;
 
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex, RwLock, RwLockWriteGuard};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use utils::current_time_duration;
 
 use crate::acks::{AckContainer, ApplyAck};
 
@@ -273,9 +275,10 @@ impl RuusterQueues {
                 uuid: uuid_str.clone(),
                 payload,
                 metadata: metadata.or(Some(Metadata {
-                    created_at: Some(Instant::now()),
+                    created_at: current_time_duration(),
                     routing_key: None,
                     dead_letter: None,
+                    persistent: false,
                 })),
             };
 
@@ -374,10 +377,10 @@ impl RuusterQueues {
             .metadata
             .as_ref()
             .and_then(|m| m.dead_letter.as_ref())
-            .and_then(|dl| dl.queue.clone())
+            .and_then(|dl| Some(dl.queue.clone()))
             .unwrap_or_else(|| "_requeue".to_string());
 
-        info!(queue_name = %queue_name, "requeuing message");
+        info!(drewqueue_name = %queue_name, "requeuing message");
 
         // Ensure the queue exists
         let _ = self.add_queue(&queue_name);
@@ -408,19 +411,20 @@ impl RuusterQueues {
         let dead_letter_metadata = message
             .metadata
             .get_or_insert_with(|| Metadata {
-                created_at: Some(Instant::now()),
+                created_at: utils::current_time_duration(),
                 routing_key: None,
                 dead_letter: None,
+                persistent: false,
             })
             .dead_letter
             .get_or_insert(internals::DeadLetterMetadata {
-                count: Some(0),
-                exchange: None,
-                queue: None,
+                count: 0,
+                exchange: "N/a".to_string(),
+                queue: "N/a".to_string(),
             });
 
         // Increment the dead letter count
-        dead_letter_metadata.count = Some(dead_letter_metadata.count.unwrap_or(0) + 1);
+        dead_letter_metadata.count += 1;
 
         let queue = self.get_queue(&DEADLETTER_QUEUE_NAME.to_string())?;
         let mut queue_guard = queue.lock().map_err(|e| {

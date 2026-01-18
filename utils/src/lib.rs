@@ -1,4 +1,5 @@
-use std::io;
+use std::{io, time::Duration};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
@@ -30,4 +31,16 @@ pub fn generate_random_string(length: usize) -> String {
         .take(length)
         .map(char::from)
         .collect()
+}
+
+/// Utility function for getting current time as milliseconds since UNIX_EPOCH.
+////
+/// # Examples
+///
+/// ```
+/// let current_time_ms = utils::current_time_duration();
+/// ```
+pub fn current_time_duration() -> Duration {
+    let start = SystemTime::now();
+    start.duration_since(UNIX_EPOCH).expect("Time went backwards")
 }

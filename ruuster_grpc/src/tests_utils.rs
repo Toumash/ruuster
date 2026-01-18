@@ -63,6 +63,7 @@ pub async fn create_queues(
         let response = client
             .queue_declare(QueueDeclareRequest {
                 queue_name: name.to_string(),
+                durable: false,
             })
             .await;
 
@@ -94,6 +95,7 @@ pub async fn create_exchanges(
                     kind: exchange_kind_id,
                     exchange_name: name.to_string(),
                 }),
+                durable: false,
             })
             .await;
 
@@ -126,6 +128,7 @@ pub async fn create_bindings(
                 exchange_name: exchange_name.to_string(),
                 queue_name: queue_name.to_string(),
                 metadata: None,
+                durable: false,
             })
             .await;
 
