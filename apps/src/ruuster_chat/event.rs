@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crossterm::event::{Event as CrosstermEvent, KeyEvent};
+use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 
 use tokio::sync::mpsc;
@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 pub enum Event {
     Tick,
     Key(KeyEvent),
+    Mouse(MouseEvent),
     Resize(u16, u16),
     ChatEvent(crate::update::ChatEvent),
 }
@@ -51,6 +52,9 @@ impl EventHandler {
                                 if key.kind == crossterm::event::KeyEventKind::Press {
                                     let _ = _sender.send(Event::Key(key));
                                 }
+                            },
+                            CrosstermEvent::Mouse(mouse) => {
+                                let _ = _sender.send(Event::Mouse(mouse));
                             },
                             CrosstermEvent::Resize(x, y) => {
                                 let _ = _sender.send(Event::Resize(x, y));

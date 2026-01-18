@@ -16,7 +16,7 @@ use std::io;
 
 use crate::app::App;
 use crate::event::{Event, EventHandler};
-use crate::input_handler::handle_key_events;
+use crate::input_handler::{handle_key_events, handle_mouse_events};
 use crate::model::RunningState;
 
 #[tokio::main]
@@ -45,6 +45,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match event {
             Event::Key(key_event) => {
                 handle_key_events(key_event, &mut app).await?;
+            }
+            Event::Mouse(mouse_event) => {
+                handle_mouse_events(mouse_event, &mut app);
             }
             Event::ChatEvent(chat_event) => {
                 app.update(chat_event).await?;

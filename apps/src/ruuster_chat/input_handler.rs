@@ -1,7 +1,7 @@
 use crate::app::App;
 use crate::model::{ChatMessage, RunningState};
 use crate::update::ChatEvent;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 
 pub async fn handle_key_events(
     key_event: KeyEvent,
@@ -18,6 +18,25 @@ pub async fn handle_key_events(
         RunningState::RoomListView => handle_room_list_view_input(key_event, app).await,
         RunningState::ChatView => handle_chat_view_input(key_event, app).await,
         RunningState::Done => Ok(()),
+    }
+}
+
+pub fn handle_mouse_events(mouse_event: MouseEvent, app: &mut App) {
+    // Only handle mouse events in chat view
+    if app.model.running_state != RunningState::ChatView {
+        return;
+    }
+
+    match mouse_event.kind {
+        MouseEventKind::ScrollUp => {
+            // Scroll up (increase offset to see older messages)
+            app.model.scroll_offset = app.model.scroll_offset.saturating_add(3);
+        }
+        MouseEventKind::ScrollDown => {
+            // Scroll down (decrease offset to see newer messages)
+            app.model.scroll_offset = app.model.scroll_offset.saturating_sub(3);
+        }
+        _ => {}
     }
 }
 
@@ -97,6 +116,8 @@ async fn handle_chat_view_input(
                         payload,
                     };
                     app.update(ChatEvent::SendMessage(message)).await?;
+                    // Reset scroll to bottom when sending a message
+                    app.model.scroll_offset = 0;
                 }
             }
         }
@@ -108,6 +129,22 @@ async fn handle_chat_view_input(
         }
         KeyCode::Esc => {
             app.update(ChatEvent::ExitRoom).await?;
+        }
+        KeyCode::Up | KeyCode::PageUp => {
+            // Scroll up (see older messages)
+            app.model.scroll_offset = app.model.scroll_offset.saturating_add(3);
+        }
+        KeyCode::Down | KeyCode::PageDown => {
+            // Scroll down (see newer messages)
+            app.model.scroll_offset = app.model.scroll_offset.saturating_sub(3);
+        }
+        KeyCode::Home => {
+            // Scroll to top (oldest messages)
+            app.model.scroll_offset = u16::MAX;
+        }
+        KeyCode::End => {
+            // Scroll to bottom (newest messages)
+            app.model.scroll_offset = 0;
         }
         _ => {}
     }

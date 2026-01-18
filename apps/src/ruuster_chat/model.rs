@@ -1,5 +1,4 @@
 use crate::ruuster::ChatClient;
-use crate::update::ChatEvent;
 use serde_derive::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
@@ -24,6 +23,8 @@ pub struct Model {
     pub chat_client: ChatClient,
     pub input: String,
     pub event_sender: Option<mpsc::UnboundedSender<crate::event::Event>>,
+    /// Manual scroll offset for messages (0 = auto-scroll to bottom)
+    pub scroll_offset: u16,
 }
 
 impl Model {

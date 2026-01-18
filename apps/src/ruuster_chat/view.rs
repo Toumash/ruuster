@@ -143,10 +143,25 @@ fn render_chat_view(app: &App, frame: &mut Frame) {
     // The visible height is the chunk height minus 2 for borders
     let visible_height = chunks[1].height.saturating_sub(2) as usize;
     let total_lines = messages.len();
-    let scroll_offset = total_lines.saturating_sub(visible_height) as u16;
+    let max_scroll = total_lines.saturating_sub(visible_height) as u16;
+
+    // Apply manual scroll offset (0 = bottom/newest, higher = older)
+    // Clamp the manual offset to valid range
+    let manual_offset = app.model.scroll_offset.min(max_scroll);
+    let scroll_offset = max_scroll.saturating_sub(manual_offset);
+
+    let scroll_indicator = if manual_offset > 0 {
+        format!("Messages (↑{} more below)", manual_offset)
+    } else {
+        "Messages".to_string()
+    };
 
     let messages_widget = Paragraph::new(messages_text)
-        .block(Block::default().borders(Borders::ALL).title("Messages"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(scroll_indicator),
+        )
         .scroll((scroll_offset, 0));
     frame.render_widget(messages_widget, chunks[1]);
 
