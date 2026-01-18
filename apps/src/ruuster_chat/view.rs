@@ -28,7 +28,7 @@ fn render_start_view(app: &App, frame: &mut Frame) {
             ]
             .as_ref(),
         )
-        .split(frame.size());
+        .split(frame.area());
 
     let title = Paragraph::new("Ruuster Chat")
         .style(Style::default().fg(Color::Cyan))
@@ -69,7 +69,7 @@ fn render_room_list_view(app: &App, frame: &mut Frame) {
             ]
             .as_ref(),
         )
-        .split(frame.size());
+        .split(frame.area());
 
     let title = Paragraph::new("Room List")
         .style(Style::default().fg(Color::Cyan))
@@ -111,7 +111,7 @@ fn render_chat_view(app: &App, frame: &mut Frame) {
             ]
             .as_ref(),
         )
-        .split(frame.size());
+        .split(frame.area());
 
     let room_info = format!(
         "Room: {} | User: {}",

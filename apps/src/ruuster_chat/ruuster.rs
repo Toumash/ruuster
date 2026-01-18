@@ -1,11 +1,10 @@
 use exchanges::ExchangeKind;
 use protos::{
     ruuster_client::RuusterClient, BindRequest, ConsumeRequest, ExchangeDeclareRequest,
-    ExchangeDefinition, ProduceRequest, QueueDeclareRequest,
+    ExchangeDefinition, ProduceRequest, QueueDeclareRequest, RemoveQueueRequest, UnbindRequest,
 };
 use std::fmt::Display;
 use thiserror::Error;
-use tokio::sync::mpsc;
 use tonic::transport::Channel;
 use tonic::Streaming;
 
@@ -107,8 +106,7 @@ impl ChatClient {
             .as_mut()
             .ok_or_else(|| ChatRuusterClientError::Disconnected)?;
 
-        // Unbind and remove queue are not supported in the current protos
-        /*
+        // Unbind user queue from room exchange
         let unbind_request = UnbindRequest {
             metadata: None,
             exchange_name: room_id,
@@ -116,11 +114,9 @@ impl ChatClient {
         };
         let _ = client.unbind(unbind_request).await;
 
-        let remove_queue_request = RemoveQueueRequest {
-            queue_name: nick,
-        };
+        // Remove user queue
+        let remove_queue_request = RemoveQueueRequest { queue_name: nick };
         let _ = client.remove_queue(remove_queue_request).await;
-        */
 
         Ok(())
     }
