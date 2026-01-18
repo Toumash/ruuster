@@ -138,8 +138,16 @@ fn render_chat_view(app: &App, frame: &mut Frame) {
         .collect();
 
     let messages_text = messages.join("\n");
+
+    // Calculate scroll offset to show latest messages
+    // The visible height is the chunk height minus 2 for borders
+    let visible_height = chunks[1].height.saturating_sub(2) as usize;
+    let total_lines = messages.len();
+    let scroll_offset = total_lines.saturating_sub(visible_height) as u16;
+
     let messages_widget = Paragraph::new(messages_text)
-        .block(Block::default().borders(Borders::ALL).title("Messages"));
+        .block(Block::default().borders(Borders::ALL).title("Messages"))
+        .scroll((scroll_offset, 0));
     frame.render_widget(messages_widget, chunks[1]);
 
     let input = Paragraph::new(app.model.input.as_str())
