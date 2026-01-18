@@ -53,7 +53,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 app.update(chat_event).await?;
             }
             Event::Tick => {}
-            _ => {}
         }
     }
 

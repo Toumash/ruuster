@@ -11,7 +11,6 @@ pub enum Event {
     Tick,
     Key(KeyEvent),
     Mouse(MouseEvent),
-    Resize(u16, u16),
     ChatEvent(crate::update::ChatEvent),
 }
 
@@ -56,10 +55,7 @@ impl EventHandler {
                             CrosstermEvent::Mouse(mouse) => {
                                 let _ = _sender.send(Event::Mouse(mouse));
                             },
-                            CrosstermEvent::Resize(x, y) => {
-                                let _ = _sender.send(Event::Resize(x, y));
-                            },
-                            // Ignore other events but don't break
+                            // Ignore other events (resize is handled automatically by ratatui)
                             _ => {},
                         }
                     }
