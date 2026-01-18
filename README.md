@@ -46,4 +46,32 @@ cargo run --bin docker_demo -- --server-addr "http://127.0.0.1:50051"
 To develop on NixOs you need to have `direnv` installed and enabled.
 Then just run `direnv allow` in the project root and it will automatically load the nix shell with all dependencies.
 
+Also in user settings json you need those entries:
+
+```
+    "rust-analyzer.rustcSource": "discover",
+    "rust-analyzer.cargo.allFeatures": true,
+    "rust-analyzer.checkOnSave.command": "clippy"
+```
+
+In order to use CodeLLDB in VSCode on NixOS, use this configuration for vscode in pkgs: 
+
+```
+  environment.systemPackages = with pkgs; [
+    # your other packages
+
+    # --- VSCODE FHS WRAPPER ---
+    (symlinkJoin {
+      name = "code";
+      paths = [ vscode.fhs ];
+      nativeBuildInputs = [ makeWrapper ];
+      postBuild = ''
+        wrapProgram $out/bin/code \
+          --add-flags "--extensions-dir ~/.vscode-fhs-extensions"
+      '';
+    })
+
+  ];
+```
+
 

@@ -6,7 +6,9 @@ members = [
     "protos",
     "ruuster_grpc",
     "utils",
-    "apps"
-, "internals"]
+    "apps",
+    "internals",
+    "example_scenarios"
+]
 
 resolver = "2"
