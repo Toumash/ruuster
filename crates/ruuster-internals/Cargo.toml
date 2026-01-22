@@ -1,0 +1,12 @@
+[package]
+name = "ruuster-internals"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ruuster-protos = { path = "../ruuster-protos" }
+log = "0.4.21"
+thiserror = "2.0.18"
+uuid = { version = "1.8.0", features = ["v4"]}
+prost-types = "0.14.2"
+tonic = "0.14.2"

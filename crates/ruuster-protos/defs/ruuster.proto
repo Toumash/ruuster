@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package ruuster_v1;
+
+import "google/protobuf/timestamp.proto";
+
+service RuusterService {
+  rpc Produce(ProduceRequest) returns (ProduceResponse);
+  rpc Consume(ConsumeRequest) returns (stream Message); 
+}
+
+message Message {
+    string uuid = 1;
+    optional string routing_key = 2;
+    bytes payload = 3;
+    optional MessageMetadata metadata = 4;
+}
+
+message MessageMetadata {
+    optional google.protobuf.Timestamp client_time = 1;
+}
+
+message ProduceRequest {
+  string exchange = 1;
+  Message message = 2;
+}
+
+message ProduceResponse {
+  bool success = 1;
+  string error_message = 2;
+}
+
+message ConsumeRequest {
+  string queue_name = 1;
+}

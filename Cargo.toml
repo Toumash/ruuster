@@ -8,7 +8,12 @@ members = [
     "utils",
     "apps",
     "internals",
-    "example_scenarios"
+    "example_scenarios",
+    "crates/ruuster-server",
+    "crates/ruuster-internals",
+    "crates/ruuster-protos",
+    "crates/ruuster-core",
+    "crates/ruuster-router"
 ]
 
 resolver = "2"

@@ -1,0 +1,12 @@
+[package]
+name = "ruuster-router"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ruuster-internals = { path = "../ruuster-internals" }
+ruuster-core = { path = "../ruuster-core" }
+dashmap = "6.1.0"
+
+[dev-dependencies]
+uuid = "1.19.0"

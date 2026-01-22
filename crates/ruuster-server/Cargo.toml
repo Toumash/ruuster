@@ -1,0 +1,20 @@
+[package]
+name = "ruuster-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tonic = "0.14.2"
+prost = "0.14.2"
+futures = "0.3" 
+uuid = { version = "1.0", features = ["v4"] }
+
+ruuster-protos = { path = "../ruuster-protos" }
+ruuster-internals = { path = "../ruuster-internals" }
+ruuster-core = { path = "../ruuster-core" }
+ruuster-router = { path = "../ruuster-router" }
+async-stream = "0.3.6"
+tonic-reflection = "0.14.2"
+
+
