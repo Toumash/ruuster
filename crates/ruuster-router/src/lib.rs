@@ -6,3 +6,5 @@ pub use exchange::Exchange;
 pub use registry::Router;
 pub use strategies::direct::DirectStrategy;
 pub use strategies::fanout::FanoutStrategy;
+pub use strategies::header::HeaderStrategy;
+pub use strategies::topic::TopicStrategy;

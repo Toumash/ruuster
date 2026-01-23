@@ -1,5 +1,7 @@
 pub mod direct;
 pub mod fanout;
+pub mod header;
+pub mod topic;
 
 use dashmap::DashSet;
 use ruuster_core::Queue;
