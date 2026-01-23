@@ -1,17 +1,30 @@
 use ruuster_protos::v1::ruuster_service_client::RuusterServiceClient;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest};
+use ruuster_server::ServerConfig;
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::Request;
 use uuid::Uuid;
 
+async fn setup_server_and_client() -> RuusterServiceClient<tonic::transport::Channel> {
+    // Spawn the server in the background
+    let config = ServerConfig::default();
+    tokio::spawn(async move {
+        ruuster_server::run_server(config).await.unwrap();
+    });
+
+    // Give the server time to start
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Connect to the server
+    RuusterServiceClient::connect("http://127.0.0.1:50051")
+        .await
+        .expect("Failed to connect to server")
+}
+
 #[tokio::test]
 async fn test_full_message_flow() {
-    // 1. We assume the server is running on 50051
-    // (In a real test, you'd spawn the server task here)
-    let mut client = RuusterServiceClient::connect("http://127.0.0.1:50051")
-        .await
-        .expect("Failed to connect to server. Is it running?");
+    let mut client = setup_server_and_client().await;
 
     let queue_name = "default_q";
     let exchange_name = "default";
