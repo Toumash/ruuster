@@ -24,11 +24,11 @@ async fn test_full_message_flow() {
     let mut stream = client.consume(consume_req).await.unwrap().into_inner();
 
     // 3. Produce a message
-    let test_uuid = Uuid::new_v4().to_string();
+    let test_uuid = Uuid::new_v4();
     let produce_req = Request::new(ProduceRequest {
         exchange: exchange_name.into(),
         message: Some(ProtoMsg {
-            uuid: test_uuid.clone(),
+            uuid: test_uuid.as_bytes().to_vec(),
             routing_key: Some(queue_name.into()),
             payload: b"integration-test-payload".to_vec(),
             ..Default::default()
@@ -41,8 +41,8 @@ async fn test_full_message_flow() {
     // We use a timeout to avoid hanging forever if it fails
     match timeout(Duration::from_secs(2), stream.message()).await {
         Ok(Ok(Some(msg))) => {
-            assert_eq!(msg.uuid, test_uuid);
-            println!("Successfully received message: {}", msg.uuid);
+            assert_eq!(msg.uuid, test_uuid.as_bytes().to_vec());
+            println!("Successfully received message: {:?}", msg.uuid);
         }
         Ok(Ok(None)) => panic!("Stream ended without message"),
         Ok(Err(e)) => panic!("Stream error: {}", e),

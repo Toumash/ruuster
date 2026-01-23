@@ -100,7 +100,7 @@ mod tests {
         let req = Request::new(ProduceRequest {
             exchange: "test_ex".into(),
             message: Some(ProtoMsg {
-                uuid: Uuid::new_v4().to_string(),
+                uuid: Uuid::new_v4().as_bytes().to_vec(),
                 routing_key: Some("test_q".into()),
                 payload: b"hello".to_vec(),
                 ..Default::default()
@@ -117,7 +117,7 @@ mod tests {
         let req = Request::new(ProduceRequest {
             exchange: "invalid_ex".into(),
             message: Some(ProtoMsg {
-                uuid: Uuid::new_v4().to_string(),
+                uuid: Uuid::new_v4().as_bytes().to_vec(),
                 ..Default::default()
             }),
         });
