@@ -10,14 +10,14 @@ service RuusterService {
 }
 
 message Message {
-    string uuid = 1;
-    optional string routing_key = 2;
-    bytes payload = 3;
-    optional MessageMetadata metadata = 4;
+  bytes uuid = 1;
+  optional string routing_key = 2;
+  bytes payload = 3;
+  optional MessageMetadata metadata = 4;
 }
 
 message MessageMetadata {
-    optional google.protobuf.Timestamp client_time = 1;
+  optional google.protobuf.Timestamp client_time = 1;
 }
 
 message ProduceRequest {

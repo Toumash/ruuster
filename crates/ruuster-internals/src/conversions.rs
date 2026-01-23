@@ -15,7 +15,7 @@ impl TryFrom<ProtoMsg> for Message {
     fn try_from(proto: ProtoMsg) -> Result<Self, Self::Error> {
         Ok(Self {
             // MATURE: Validate UUID. Do not invent one.
-            uuid: Uuid::parse_str(&proto.uuid)
+            uuid: Uuid::from_slice(&proto.uuid)
                 .map_err(|_| RuusterError::InvalidMetadata("Invalid or missing UUID".into()))?,
 
             routing_key: proto.routing_key,
@@ -46,7 +46,7 @@ impl From<ProtoMeta> for MessageMetadata {
 impl From<Message> for ProtoMsg {
     fn from(internal: Message) -> Self {
         Self {
-            uuid: internal.uuid.to_string(),
+            uuid: internal.uuid.as_bytes().to_vec(),
             routing_key: internal.routing_key,
             payload: (*internal.payload).clone(),
             metadata: internal.metadata.map(|m| m.into()),
