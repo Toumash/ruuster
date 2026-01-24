@@ -1,0 +1,10 @@
+[package]
+name = "ruuster-acks"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uuid = { version = "1.10", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
+dashmap = "6.1.0"
+ruuster-internals = { path = "../ruuster-internals" }
+tonic = "0.11"

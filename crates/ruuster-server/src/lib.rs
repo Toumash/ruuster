@@ -7,11 +7,14 @@
 mod server;
 mod topology_service;
 mod message_service;
+mod acks_service;
 
 pub use server::RuusterServer;
 
 use ruuster_core::Queue;
 use ruuster_protos::v1::message_service_server::MessageServiceServer;
+use ruuster_protos::v1::topology_service_server::TopologyServiceServer;
+use ruuster_protos::v1::ack_service_server::AckServiceServer;
 use ruuster_router::{DirectStrategy, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -73,10 +76,12 @@ pub async fn run_server_with_router(
     config: ServerConfig,
     router: Arc<Router>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ruuster_service = RuusterServer::new(router);
+    let ruuster_service = Arc::new(RuusterServer::new(router));
     let mut server_builder = Server::builder();
 
-    let service = MessageServiceServer::new(ruuster_service);
+    let message_service = MessageServiceServer::from_arc(ruuster_service.clone());
+    let topology_service = TopologyServiceServer::from_arc(ruuster_service.clone());
+    let ack_service = AckServiceServer::from_arc(ruuster_service.clone());
 
     if config.enable_reflection {
         let reflection_service = tonic_reflection::server::Builder::configure()
@@ -89,7 +94,9 @@ pub async fn run_server_with_router(
         );
 
         server_builder
-            .add_service(service)
+            .add_service(message_service)
+            .add_service(topology_service)
+            .add_service(ack_service)
             .add_service(reflection_service)
             .serve(config.addr)
             .await?;
@@ -97,7 +104,9 @@ pub async fn run_server_with_router(
         println!("🚀 Ruuster Broker started on {}", config.addr);
 
         server_builder
-            .add_service(service)
+            .add_service(message_service)
+            .add_service(topology_service)
+            .add_service(ack_service)
             .serve(config.addr)
             .await?;
     }
