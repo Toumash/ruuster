@@ -1,6 +1,6 @@
 pub mod v1 {
     // The standard generated code
-    tonic::include_proto!("ruuster_v1");
+    tonic::include_proto!("messages_v1");
     tonic::include_proto!("topology_v1");
 
     // The binary data required for gRPC Reflection

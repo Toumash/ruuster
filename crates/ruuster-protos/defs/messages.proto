@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package ruuster_v1;
+package messages_v1;
 
 import "google/protobuf/timestamp.proto";
 
-service RuusterService {
+service MessageService {
   rpc Produce(ProduceRequest) returns (ProduceResponse);
   rpc Consume(ConsumeRequest) returns (stream Message); 
 }

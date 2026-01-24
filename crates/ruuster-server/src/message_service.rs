@@ -1,6 +1,6 @@
 use futures::Stream;
 use ruuster_internals::Message;
-use ruuster_protos::v1::ruuster_service_server::RuusterService;
+use ruuster_protos::v1::message_service_server::MessageService;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest, ProduceResponse};
 use std::pin::Pin;
 use std::sync::Arc;
@@ -9,7 +9,7 @@ use tonic::{Request, Response, Status};
 use crate::server::RuusterServer;
 
 #[tonic::async_trait]
-impl RuusterService for RuusterServer {
+impl MessageService for RuusterServer {
     async fn produce(
         &self,
         request: Request<ProduceRequest>,

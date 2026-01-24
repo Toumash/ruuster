@@ -6,12 +6,12 @@
 
 mod server;
 mod topology_service;
-mod service;
+mod message_service;
 
 pub use server::RuusterServer;
 
 use ruuster_core::Queue;
-use ruuster_protos::v1::ruuster_service_server::RuusterServiceServer;
+use ruuster_protos::v1::message_service_server::MessageServiceServer;
 use ruuster_router::{DirectStrategy, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -76,7 +76,7 @@ pub async fn run_server_with_router(
     let ruuster_service = RuusterServer::new(router);
     let mut server_builder = Server::builder();
 
-    let service = RuusterServiceServer::new(ruuster_service);
+    let service = MessageServiceServer::new(ruuster_service);
 
     if config.enable_reflection {
         let reflection_service = tonic_reflection::server::Builder::configure()

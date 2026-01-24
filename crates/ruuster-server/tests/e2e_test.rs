@@ -1,4 +1,4 @@
-use ruuster_protos::v1::ruuster_service_client::RuusterServiceClient;
+use ruuster_protos::v1::message_service_client::MessageServiceClient;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest};
 use ruuster_server::ServerConfig;
 use std::time::Duration;
@@ -6,7 +6,7 @@ use tokio::time::timeout;
 use tonic::Request;
 use uuid::Uuid;
 
-async fn setup_server_and_client() -> RuusterServiceClient<tonic::transport::Channel> {
+async fn setup_server_and_client() -> MessageServiceClient<tonic::transport::Channel> {
     // Spawn the server in the background
     let config = ServerConfig::default();
     tokio::spawn(async move {
@@ -17,7 +17,7 @@ async fn setup_server_and_client() -> RuusterServiceClient<tonic::transport::Cha
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Connect to the server
-    RuusterServiceClient::connect("http://127.0.0.1:50051")
+    MessageServiceClient::connect("http://127.0.0.1:50051")
         .await
         .expect("Failed to connect to server")
 }
