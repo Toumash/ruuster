@@ -50,7 +50,7 @@ impl ServerConfig {
 /// Initialize a router with default topology
 /// This sets up a basic exchange and queue configuration for testing/demo purposes
 pub fn setup_default_topology(router: &Arc<Router>) {
-    router.declare_exchange("default", Box::new(DirectStrategy));
+    router.add_exchange("default", Box::new(DirectStrategy));
     let default_q = Arc::new(Queue::new("default_q".into(), 1000));
     router.add_queue(Arc::clone(&default_q));
 

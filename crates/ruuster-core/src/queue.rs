@@ -34,7 +34,7 @@ impl Queue {
             .lock()
             .map_err(|_| RuusterError::InternalError("Mutex poisoned".to_string()))?;
 
-        if buffer.len() >= self.max_capacity {
+        if buffer.len() as u64 >= self.max_capacity {
             return Err(RuusterError::QueueFull(self.name.clone()));
         }
 
@@ -55,7 +55,7 @@ impl Queue {
     }
 
     pub fn len(&self) -> u64 {
-        self.buffer.lock().map(|b| b.len()).unwrap_or(0) // Silent failure on poisoned lock
+        self.buffer.lock().map(|b| b.len() as u64).unwrap_or(0) // Silent failure on poisoned lock
     }
 
     pub fn is_empty(&self) -> bool {

@@ -22,7 +22,7 @@ impl Router {
 
     /// Declare (Create) an exchange with a specific name and strategy.
     /// If an exchange with that name exists, it returns the existing one.
-    pub fn declare_exchange(
+    pub fn add_exchange(
         &self,
         name: &str,
         strategy: Box<dyn RoutingStrategy>,
@@ -58,6 +58,20 @@ impl Router {
     pub fn add_queue(&self, queue: Arc<Queue>) {
         self.queues.insert(queue.name.clone(), queue);
     }
+
+    pub fn remove_queue(&self, name: &str) -> Result<(), RuusterError> {
+        self.queues.remove(name).ok_or_else(|| {
+            RuusterError::QueueNotFound(format!("Queue '{}' not found", name))
+        })?;
+        Ok(())
+    }
+
+    pub fn remove_exchange(&self, name: &str) -> Result<(), RuusterError> {
+        self.exchanges.remove(name).ok_or_else(|| {
+            RuusterError::ExchangeNotFound(format!("Exchange '{}' not found", name))
+        })?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -70,7 +84,7 @@ mod tests {
         let router = Router::new();
 
         // 1. Declare
-        router.declare_exchange("orders", Box::new(DirectStrategy));
+        router.add_exchange("orders", Box::new(DirectStrategy));
 
         // 2. Retrieve
         let ex = router.get_exchange("orders");
@@ -78,7 +92,7 @@ mod tests {
         assert_eq!(ex.unwrap().name, "orders");
 
         // 3. Duplicate declaration shouldn't overwrite or crash
-        router.declare_exchange("orders", Box::new(DirectStrategy));
+        router.add_exchange("orders", Box::new(DirectStrategy));
         assert!(router.get_exchange("orders").is_some());
     }
 }

@@ -40,7 +40,7 @@ async fn declare_queue(
     Ok(())
 }
 
-async fn declare_exchange(
+async fn add_exchange(
     client: &mut RuusterClient<Channel>,
     exchange_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -131,7 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("failed to create ruuster client");
 
     declare_queue(&mut client, &args.queue_name).await?;
-    declare_exchange(&mut client, &args.exchange_name).await?;
+    add_exchange(&mut client, &args.exchange_name).await?;
     bind_queue(&mut client, &args.exchange_name, &args.queue_name).await?;
 
     info!(

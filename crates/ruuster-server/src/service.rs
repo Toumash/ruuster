@@ -73,7 +73,7 @@ mod tests {
     async fn setup_test_server() -> RuusterServer {
         let router = Arc::new(ruuster_router::Router::new());
         // Setup a default routing topology
-        router.declare_exchange("test_ex", Box::new(DirectStrategy));
+        router.add_exchange("test_ex", Box::new(DirectStrategy));
         let q = Arc::new(Queue::new("test_q".into(), 10));
         router.add_queue(Arc::clone(&q));
 
