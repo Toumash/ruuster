@@ -7,12 +7,12 @@ use tokio::sync::Notify;
 pub struct Queue {
     pub name: String,
     buffer: Mutex<VecDeque<Message>>,
-    max_capacity: usize,
+    max_capacity: u64,
     pub notify: Arc<Notify>,
 }
 
 impl Queue {
-    pub fn new(name: String, max_capacity: usize) -> Self {
+    pub fn new(name: String, max_capacity: u64) -> Self {
         Self {
             name,
             buffer: Mutex::new(VecDeque::new()),
@@ -54,7 +54,7 @@ impl Queue {
         Ok(buffer.pop_front())
     }
 
-    pub fn len(&self) -> usize {
+    pub fn len(&self) -> u64 {
         self.buffer.lock().map(|b| b.len()).unwrap_or(0) // Silent failure on poisoned lock
     }
 

@@ -4,9 +4,11 @@
 //! It can be used as a library for embedding the broker in other applications,
 //! or run standalone via the binary.
 
+mod server;
+mod topology_service;
 mod service;
 
-pub use service::RuusterServer;
+pub use server::RuusterServer;
 
 use ruuster_core::Queue;
 use ruuster_protos::v1::ruuster_service_server::RuusterServiceServer;

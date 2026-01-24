@@ -1,32 +1,33 @@
 syntax = "proto3";
 package topology_v1;
 
-service Topology {
-    rpc AddQueue(QueueDeclareRequest) returns (QueueDeclareResponse);
+service TopologyService {
+    rpc AddQueue(AddQueueRequest) returns (AddQueueResponse);
     rpc RemoveQueue(RemoveQueueRequest) returns (RemoveQueueResponse);
-    rpc AddExchange(ExchangeDeclareRequest) returns (ExchangeDeclareResponse);
+    rpc AddExchange(AddExchangeRequest) returns (AddExchangeResponse);
     rpc RemoveExchange(RemoveExchangeRequest) returns (RemoveExchangeResponse);
     rpc Bind(BindRequest) returns (BindResponse);
     rpc Unbind(UnbindRequest) returns (UnbindResponse);
 }
 
-message QueueDeclareRequest {
+message AddQueueRequest {
     string queue_name = 1;
+    uint64 max_capacity = 3;
     bool durable = 2;
 }
 
-message QueueDeclareResponse {
+message AddQueueResponse {
     bool success = 1;
     string error_message = 2;
 }
 
-message ExchangeDeclareRequest {
+message AddExchangeRequest {
     string exchange_name = 1;
     int32 kind = 2;
     bool durable = 3;
 }
 
-message ExchangeDeclareResponse {
+message AddExchangeResponse {
     bool success = 1;
     string error_message = 2;
 }

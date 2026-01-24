@@ -2,20 +2,11 @@ use futures::Stream;
 use ruuster_internals::Message;
 use ruuster_protos::v1::ruuster_service_server::RuusterService;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest, ProduceResponse};
-use ruuster_router::Router;
 use std::pin::Pin;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
-pub struct RuusterServer {
-    pub router: Arc<Router>,
-}
-
-impl RuusterServer {
-    pub fn new(router: Arc<Router>) -> Self {
-        Self { router }
-    }
-}
+use crate::server::RuusterServer;
 
 #[tonic::async_trait]
 impl RuusterService for RuusterServer {
@@ -80,7 +71,7 @@ mod tests {
     use uuid::Uuid;
 
     async fn setup_test_server() -> RuusterServer {
-        let router = Arc::new(Router::new());
+        let router = Arc::new(ruuster_router::Router::new());
         // Setup a default routing topology
         router.declare_exchange("test_ex", Box::new(DirectStrategy));
         let q = Arc::new(Queue::new("test_q".into(), 10));
