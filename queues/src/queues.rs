@@ -565,6 +565,9 @@ impl RuusterQueues {
                             error!(error=%e, "{}", msg);
                             return Status::internal(msg);
                         }
+                        // Record consumed message metric
+                        counter!("ruuster_messages_consumed_total", "queue" => queue_name.clone())
+                            .increment(1);
                         info!("message correctly sent over channel");
                     } else {
                         // tokio::task::yield_now().await;
