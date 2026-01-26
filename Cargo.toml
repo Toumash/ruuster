@@ -1,14 +1,6 @@
 [workspace]
 
 members = [
-    "queues",
-    "exchanges",
-    "protos",
-    "ruuster_grpc",
-    "utils",
-    "apps",
-    "internals",
-    "example_scenarios",
     "crates/ruuster-server",
     "crates/ruuster-internals",
     "crates/ruuster-protos",
