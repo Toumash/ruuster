@@ -100,6 +100,7 @@ mod tests {
             metadata: Some(MessageMetadata {
                 client_time: Some(SystemTime::now()),
                 arrival_time: None, // The Queue should fill this
+                headers: std::collections::HashMap::new(),
             }),
         }
     }

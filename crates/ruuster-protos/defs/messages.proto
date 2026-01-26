@@ -18,6 +18,7 @@ message Message {
 
 message MessageMetadata {
   optional google.protobuf.Timestamp client_time = 1;
+  map<string, string> headers = 2;
 }
 
 message ProduceRequest {

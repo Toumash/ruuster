@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     sync::Arc,
     time::{Instant, SystemTime},
 };
@@ -16,4 +17,5 @@ pub struct Message {
 pub struct MessageMetadata {
     pub client_time: Option<SystemTime>,
     pub arrival_time: Option<Instant>,
+    pub headers: HashMap<String, String>,
 }

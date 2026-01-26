@@ -17,6 +17,8 @@ use std::sync::Arc;
 /// - `all:format=pdf,type=report` - Matches if format=pdf AND type=report
 /// - `any:priority=high,priority=urgent` - Matches if priority=high OR priority=urgent
 ///
+/// Message headers are stored in `MessageMetadata.headers` as a `HashMap<String, String>`.
+///
 /// Common use cases:
 /// - Content-based routing: `format=json`, `encoding=utf8`
 /// - Priority queues: `priority=high`, `priority=low`
@@ -67,22 +69,11 @@ impl HeaderStrategy {
     }
 
     /// Extract headers from message metadata
-    /// For now, we'll store headers in the routing_key as a temporary solution
-    /// Format: "key1=value1,key2=value2"
     fn extract_headers(msg: &Message) -> HashMap<String, String> {
-        let mut headers = HashMap::new();
-
-        // Parse routing_key as comma-separated key=value pairs
-        if let Some(routing_key) = &msg.routing_key {
-            for pair in routing_key.split(',') {
-                let kv: Vec<&str> = pair.splitn(2, '=').collect();
-                if kv.len() == 2 {
-                    headers.insert(kv[0].trim().to_string(), kv[1].trim().to_string());
-                }
-            }
-        }
-
-        headers
+        msg.metadata
+            .as_ref()
+            .map(|m| m.headers.clone())
+            .unwrap_or_default()
     }
 
     /// Check if message headers match the binding pattern
@@ -112,8 +103,7 @@ impl RoutingStrategy for HeaderStrategy {
 
         if msg_headers.is_empty() {
             return Err(RuusterError::InvalidMetadata(
-                "Header routing requires message headers (in routing_key as key=value,...)"
-                    .to_string(),
+                "Header routing requires message headers in metadata".to_string(),
             ));
         }
 
@@ -172,17 +162,26 @@ mod tests {
 
     #[test]
     fn test_extract_headers() {
+        let mut headers = HashMap::new();
+        headers.insert("format".to_string(), "pdf".to_string());
+        headers.insert("type".to_string(), "report".to_string());
+        headers.insert("priority".to_string(), "high".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("format=pdf,type=report,priority=high".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers: headers.clone(),
+            }),
         };
 
-        let headers = HeaderStrategy::extract_headers(&msg);
-        assert_eq!(headers.get("format").unwrap(), "pdf");
-        assert_eq!(headers.get("type").unwrap(), "report");
-        assert_eq!(headers.get("priority").unwrap(), "high");
+        let extracted = HeaderStrategy::extract_headers(&msg);
+        assert_eq!(extracted.get("format").unwrap(), "pdf");
+        assert_eq!(extracted.get("type").unwrap(), "report");
+        assert_eq!(extracted.get("priority").unwrap(), "high");
     }
 
     #[test]
@@ -253,11 +252,20 @@ mod tests {
         bindings.insert(Arc::clone(&pdf_reports));
         bindings.insert(Arc::clone(&high_priority));
 
+        let mut headers = HashMap::new();
+        headers.insert("format".to_string(), "pdf".to_string());
+        headers.insert("type".to_string(), "report".to_string());
+        headers.insert("priority".to_string(), "high".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("format=pdf,type=report,priority=high".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers,
+            }),
         };
 
         strategy.route(msg, &bindings).unwrap();
@@ -274,11 +282,19 @@ mod tests {
         let urgent = Arc::new(Queue::new("any:priority=high,priority=urgent".into(), 10));
         bindings.insert(Arc::clone(&urgent));
 
+        let mut headers = HashMap::new();
+        headers.insert("priority".to_string(), "urgent".to_string());
+        headers.insert("type".to_string(), "alert".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("priority=urgent,type=alert".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers,
+            }),
         };
 
         strategy.route(msg, &bindings).unwrap();
@@ -293,11 +309,18 @@ mod tests {
         let pdf_queue = Arc::new(Queue::new("all:format=pdf".into(), 10));
         bindings.insert(Arc::clone(&pdf_queue));
 
+        let mut headers = HashMap::new();
+        headers.insert("format".to_string(), "json".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("format=json".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers,
+            }),
         };
 
         let result = strategy.route(msg, &bindings);
@@ -322,88 +345,60 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_headers_with_multiple_equals() {
-        // Headers with multiple '=' should only split on first '='
+    fn test_extract_headers_empty() {
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("key=value=with=equals,normal=value".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
             metadata: None,
         };
 
         let headers = HeaderStrategy::extract_headers(&msg);
-        assert_eq!(headers.get("key").unwrap(), "value=with=equals");
-        assert_eq!(headers.get("normal").unwrap(), "value");
+        assert!(headers.is_empty());
     }
 
     #[test]
-    fn test_extract_headers_malformed_no_equals() {
-        // Malformed entries without '=' should be ignored
+    fn test_extract_headers_with_multiple_values() {
+        let mut headers = HashMap::new();
+        headers.insert("key".to_string(), "value=with=equals".to_string());
+        headers.insert("normal".to_string(), "value".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some("format=pdf,malformed,type=report".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers: headers.clone(),
+            }),
         };
 
-        let headers = HeaderStrategy::extract_headers(&msg);
-        assert_eq!(headers.get("format").unwrap(), "pdf");
-        assert_eq!(headers.get("type").unwrap(), "report");
-        assert!(!headers.contains_key("malformed"));
+        let extracted = HeaderStrategy::extract_headers(&msg);
+        assert_eq!(extracted.get("key").unwrap(), "value=with=equals");
+        assert_eq!(extracted.get("normal").unwrap(), "value");
     }
 
     #[test]
-    fn test_extract_headers_empty_key_or_value() {
-        // Empty keys or values should still be extracted (after trim)
-        let msg = Message {
-            uuid: Uuid::new_v4(),
-            routing_key: Some("=empty_key,empty_value=,  spaced = value ".into()),
-            payload: Arc::new(vec![]),
-            metadata: None,
-        };
-
-        let headers = HeaderStrategy::extract_headers(&msg);
-        // Empty key is stored as ""
-        assert_eq!(headers.get("").unwrap(), "empty_key");
-        assert_eq!(headers.get("empty_value").unwrap(), "");
-        assert_eq!(headers.get("spaced").unwrap(), "value");
-    }
-
-    #[test]
-    fn test_parse_binding_pattern_malformed() {
-        // Multiple '=' in binding pattern values
-        assert!(HeaderStrategy::parse_binding_pattern("all:key=val=ue").is_some());
-
-        // Missing '=' in pair
-        let pattern = HeaderStrategy::parse_binding_pattern("all:format=pdf,noequals,type=report");
-        assert!(pattern.is_some());
-        let p = pattern.unwrap();
-        assert_eq!(p.headers.len(), 2); // Only valid pairs counted
-        assert!(p.headers.contains_key("format"));
-        assert!(p.headers.contains_key("type"));
-        assert!(!p.headers.contains_key("noequals"));
-    }
-
-    #[test]
-    fn test_parse_binding_pattern_only_invalid_pairs() {
-        // If all pairs are invalid, should return None
-        assert!(HeaderStrategy::parse_binding_pattern("all:noequals,alsobad").is_none());
-    }
-
-    #[test]
-    fn test_header_routing_with_whitespace() {
+    fn test_header_routing_with_empty_values() {
         let strategy = HeaderStrategy;
         let bindings = DashSet::new();
 
-        let queue = Arc::new(Queue::new("all:format=pdf,type=report".into(), 10));
+        let queue = Arc::new(Queue::new("all:empty=".into(), 10));
         bindings.insert(Arc::clone(&queue));
 
-        // Message with extra whitespace around keys/values
+        let mut headers = HashMap::new();
+        headers.insert("empty".to_string(), "".to_string());
+
         let msg = Message {
             uuid: Uuid::new_v4(),
-            routing_key: Some(" format = pdf , type = report ".into()),
+            routing_key: None,
             payload: Arc::new(vec![]),
-            metadata: None,
+            metadata: Some(ruuster_internals::MessageMetadata {
+                client_time: None,
+                arrival_time: None,
+                headers,
+            }),
         };
 
         strategy.route(msg, &bindings).unwrap();

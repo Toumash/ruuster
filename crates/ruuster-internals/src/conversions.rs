@@ -35,6 +35,7 @@ impl From<ProtoMeta> for MessageMetadata {
                 std::time::UNIX_EPOCH.checked_add(dur)
             }),
             arrival_time: None, // Purposely left empty for the Queue to fill
+            headers: proto.headers,
         }
     }
 }
@@ -65,6 +66,7 @@ impl From<MessageMetadata> for ProtoMeta {
                         nanos: dur.subsec_nanos() as i32,
                     })
             }),
+            headers: internal.headers,
         }
     }
 }
