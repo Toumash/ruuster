@@ -1,3 +1,5 @@
+mod metrics_server;
+
 use opentelemetry::{trace::TraceError, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{runtime, trace as sdktrace, Resource};
@@ -14,6 +16,8 @@ use tracing_subscriber::{filter, Layer, Registry};
 
 const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:50051";
 const SERVER_ADDR_ENV: &str = "RUUSTER_SERVER_ADDR";
+const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
+const METRICS_ADDR_ENV: &str = "RUUSTER_METRICS_ADDR";
 
 fn init_tracer() -> Result<opentelemetry_sdk::trace::Tracer, TraceError> {
     opentelemetry_otlp::new_pipeline()
@@ -37,8 +41,17 @@ fn resolve_server_addr() -> Result<SocketAddr, Box<dyn std::error::Error>> {
     Ok(addr.parse()?)
 }
 
+fn resolve_metrics_addr() -> Result<SocketAddr, Box<dyn std::error::Error>> {
+    let addr =
+        std::env::var(METRICS_ADDR_ENV).unwrap_or_else(|_| DEFAULT_METRICS_ADDR.to_string());
+    Ok(addr.parse()?)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize Prometheus metrics recorder first (before tracer)
+    let metrics_handle = metrics_server::init_metrics_recorder();
+
     let tracer = init_tracer().expect("Failed to initialize tracer.");
     let filter_layer = filter::Targets::new().with_targets([
         ("ruuster_grpc", LevelFilter::INFO),
@@ -54,6 +67,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let addr = resolve_server_addr()?;
+    let metrics_addr = resolve_metrics_addr()?;
     let ruuster_queue_service = RuusterQueuesGrpc::new();
     let current_dir = std::env::current_dir()?;
     let ruuster_descriptor_path = current_dir
@@ -70,7 +84,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let span = tracing::info_span!("app_start");
         let _enter = span.enter();
         info!("starting server on address: {}", &addr);
+        info!("metrics endpoint available at: http://{}/metrics", &metrics_addr);
     }
+
+    // Spawn the metrics HTTP server in a background task
+    let metrics_handle_clone = metrics_handle.clone();
+    tokio::spawn(async move {
+        if let Err(e) = metrics_server::start_metrics_server(metrics_addr, metrics_handle_clone).await {
+            tracing::error!("Metrics server error: {:?}", e);
+        }
+    });
 
     Server::builder()
         .add_service(RuusterServer::new(ruuster_queue_service))

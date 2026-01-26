@@ -4,6 +4,7 @@ use std::{
 };
 
 use internals::Message;
+use metrics::counter;
 use tonic::Status;
 
 use tracing::{debug, error, info, instrument, warn};
@@ -78,6 +79,8 @@ impl ApplyAck for AckContainer {
                 error!(error=?e, "appling ack failed");
                 Status::internal("appling ack failed")
             })?;
+            // Record ack metric
+            counter!("ruuster_messages_acked_total").increment(1);
             info!("ack applied");
             return Ok(());
         }
@@ -104,6 +107,9 @@ impl ApplyAck for AckContainer {
     fn apply_nack(&mut self, uuid: &UuidSerialized, requeue: bool) -> Result<NackResult, Status> {
         if let Some(record) = self.remove(uuid) {
             let message = record.into_message();
+            // Record nack metric
+            counter!("ruuster_messages_nacked_total", "requeue" => requeue.to_string())
+                .increment(1);
             info!("nack applied, message removed from ack container");
             return Ok(NackResult { message, requeue });
         }

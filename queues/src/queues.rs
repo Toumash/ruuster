@@ -1,6 +1,7 @@
 use exchanges::{ExchangeContainer, ExchangeKind, ExchangeName, ExchangeType};
 
 use internals::{Message, Metadata};
+use metrics::{counter, gauge};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::Status;
@@ -61,6 +62,9 @@ impl RuusterQueues {
 
         queues_write.insert(queue_name.to_owned(), Arc::new(Mutex::new(VecDeque::new())));
 
+        // Update metrics
+        gauge!("ruuster_queues_count").set(queues_write.len() as f64);
+
         info!("queue added");
         Ok(())
     }
@@ -77,6 +81,9 @@ impl RuusterQueues {
             warn!("queue does not exist");
             return Err(Status::not_found("queue does not exist"));
         }
+
+        // Update metrics
+        gauge!("ruuster_queues_count").set(queues_write.len() as f64);
 
         info!("queue removed");
         Ok(())
@@ -117,6 +124,9 @@ impl RuusterQueues {
 
         exchanges_write.insert(exchange_name.to_owned(), exchange_kind.create());
 
+        // Update metrics
+        gauge!("ruuster_exchanges_count").set(exchanges_write.len() as f64);
+
         info!("exchange added");
         Ok(())
     }
@@ -132,6 +142,10 @@ impl RuusterQueues {
             warn!("exchange does not exist");
             return Err(Status::not_found("exchange does not exist"));
         }
+
+        // Update metrics
+        gauge!("ruuster_exchanges_count").set(exchanges_write.len() as f64);
+
         Ok(())
     }
 
@@ -286,6 +300,13 @@ impl RuusterQueues {
                     Status::internal("failed to handle message")
                 })
         };
+
+        // Record metrics for produced messages
+        if result.is_ok() {
+            counter!("ruuster_messages_produced_total", "exchange" => exchange_name.clone())
+                .increment(1);
+        }
+
         info!("message handling completed");
         result
     }
@@ -475,6 +496,9 @@ impl RuusterQueues {
                         DEFAULT_ACK_DURATION,
                     )?;
                 }
+                // Record consumed message metric
+                counter!("ruuster_messages_consumed_total", "queue" => queue_name.clone())
+                    .increment(1);
                 info!(uuid = &msg.uuid, "consuming single message completed");
                 Ok(msg)
             }
@@ -541,6 +565,9 @@ impl RuusterQueues {
                             error!(error=%e, "{}", msg);
                             return Status::internal(msg);
                         }
+                        // Record consumed message metric
+                        counter!("ruuster_messages_consumed_total", "queue" => queue_name.clone())
+                            .increment(1);
                         info!("message correctly sent over channel");
                     } else {
                         // tokio::task::yield_now().await;

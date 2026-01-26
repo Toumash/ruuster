@@ -76,3 +76,12 @@ protos = { path = "../protos" }
 utils = { path = "../utils" }
 
 clap = { version = "4.5.6", features=["derive"]}
+
+# Metrics
+metrics = "0.24"
+metrics-exporter-prometheus = "0.16"
+
+# HTTP server for metrics endpoint
+hyper = { version = "1.5", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
