@@ -14,6 +14,7 @@ ruuster-protos = { path = "../ruuster-protos" }
 ruuster-internals = { path = "../ruuster-internals" }
 ruuster-core = { path = "../ruuster-core" }
 ruuster-router = { path = "../ruuster-router" }
+ruuster-acks = { path = "../ruuster-acks" }
 async-stream = "0.3.6"
 tonic-reflection = "0.14.2"
 opentelemetry = { version = "0.23" }
@@ -23,6 +24,12 @@ opentelemetry-semantic-conventions = { version = "0.15" }
 tracing = "0.1.4"
 tracing-opentelemetry = "0.24"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter", "fmt", "registry", "json"] }
+dashmap = "6.1.0"
+thiserror = "2.0.18"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
 
 [dev-dependencies]
 futures = "0.3"

@@ -3,7 +3,6 @@ use ruuster_internals::Message;
 use ruuster_protos::v1::message_service_server::MessageService;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest, ProduceResponse};
 use std::pin::Pin;
-use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
 use crate::server::RuusterServer;
@@ -15,6 +14,8 @@ impl MessageService for RuusterServer {
         request: Request<ProduceRequest>,
     ) -> Result<Response<ProduceResponse>, Status> {
         let inner = request.into_inner();
+
+        // 1. Validate & convert proto -> internal
         let proto_msg = inner
             .message
             .ok_or_else(|| Status::invalid_argument("Missing message"))?;
@@ -23,7 +24,8 @@ impl MessageService for RuusterServer {
         let msg = Message::try_from(proto_msg)
             .map_err(|e| Status::internal(format!("Conversion error: {}", e)))?;
 
-        match self.router.route(&exchange_name, msg) {
+        // 2. Delegate to business logic layer
+        match self.message_handler.produce(&exchange_name, msg) {
             Ok(_) => Ok(Response::new(ProduceResponse {
                 success: true,
                 error_message: "".into(),
@@ -35,7 +37,6 @@ impl MessageService for RuusterServer {
         }
     }
 
-    /// SERVER STREAMING: Client subscribes to a queue and receives a stream of messages
     type ConsumeStream = Pin<Box<dyn Stream<Item = Result<ProtoMsg, Status>> + Send>>;
 
     async fn consume(
@@ -44,22 +45,25 @@ impl MessageService for RuusterServer {
     ) -> Result<Response<Self::ConsumeStream>, Status> {
         let inner = request.into_inner();
         let queue_name = inner.queue_name;
-        let router = Arc::clone(&self.router);
 
-        let output = async_stream::try_stream! {
-                while let Some(queue) = router.get_queue(&queue_name) {
+        // TODO: Get prefetch from request (extend proto)
+        let prefetch_count = inner.prefetch_count.unwrap_or(1) as u16;
 
-                    if let Some(msg) = queue.dequeue()? {
-                        yield ProtoMsg::from(msg);
-                        continue;
-                    }
+        // Delegate to message handler
+        let msg_stream = self
+            .message_handler
+            .consume(&queue_name, prefetch_count)
+            .map_err(|e| Status::internal(e.to_string()))?;
 
-                    queue.notify.notified().await;
-                }
-
+        // Convert Message stream -> ProtoMsg stream
+        let proto_stream = async_stream::try_stream! {
+            for await msg in msg_stream {
+                let msg = msg.map_err(|e| Status::internal(e.to_string()))?;
+                yield ProtoMsg::from(msg);
+            }
         };
 
-        Ok(Response::new(Box::pin(output)))
+        Ok(Response::new(Box::pin(proto_stream)))
     }
 }
 
@@ -68,6 +72,7 @@ mod tests {
     use super::*;
     use ruuster_core::Queue;
     use ruuster_router::strategies::direct::DirectStrategy;
+    use std::sync::Arc;
     use uuid::Uuid;
 
     async fn setup_test_server() -> RuusterServer {

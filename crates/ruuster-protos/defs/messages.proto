@@ -33,4 +33,5 @@ message ProduceResponse {
 
 message ConsumeRequest {
   string queue_name = 1;
+  optional uint32 prefetch_count = 2;
 }

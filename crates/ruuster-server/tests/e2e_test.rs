@@ -32,6 +32,7 @@ async fn test_full_message_flow() {
     // 2. Start a Consumer Stream in a background task
     let consume_req = Request::new(ConsumeRequest {
         queue_name: queue_name.into(),
+        prefetch_count: Some(10),
     });
 
     let mut stream = client.consume(consume_req).await.unwrap().into_inner();

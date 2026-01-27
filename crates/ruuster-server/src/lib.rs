@@ -4,17 +4,17 @@
 //! It can be used as a library for embedding the broker in other applications,
 //! or run standalone via the binary.
 
+mod domain;
+mod error;
 mod server;
-mod topology_service;
-mod message_service;
-mod acks_service;
+mod services;
 
 pub use server::RuusterServer;
 
 use ruuster_core::Queue;
+use ruuster_protos::v1::ack_service_server::AckServiceServer;
 use ruuster_protos::v1::message_service_server::MessageServiceServer;
 use ruuster_protos::v1::topology_service_server::TopologyServiceServer;
-use ruuster_protos::v1::ack_service_server::AckServiceServer;
 use ruuster_router::{DirectStrategy, Router};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -26,6 +26,11 @@ pub struct ServerConfig {
     pub addr: SocketAddr,
     pub enable_reflection: bool,
 }
+
+// pub struct BrokerConfig {
+//     pub max_queues: usize,
+//     pub max_connections: usize, // Add ack timeout, etc as needed
+// }
 
 impl Default for ServerConfig {
     fn default() -> Self {
