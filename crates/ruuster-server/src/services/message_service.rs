@@ -72,17 +72,17 @@ mod tests {
     use uuid::Uuid;
 
     async fn setup_test_server() -> RuusterServer {
-        let router = Arc::new(ruuster_router::Router::new());
-        // Setup a default routing topology
-        router.add_exchange("test_ex", Box::new(DirectStrategy));
-        let q = Arc::new(Queue::new("test_q".into(), 10));
-        router.add_queue(Arc::clone(&q));
+        let server = RuusterServer::new();
 
-        if let Some(ex) = router.get_exchange("test_ex") {
+        server.router.add_exchange("test_ex", Box::new(DirectStrategy));
+        let q = Arc::new(Queue::new("test_q".into(), 10));
+        server.router.add_queue(Arc::clone(&q));
+
+        if let Some(ex) = server.router.get_exchange("test_ex") {
             ex.bind(q);
         }
 
-        RuusterServer::new(router)
+        server
     }
 
     #[tokio::test]

@@ -1,10 +1,10 @@
-use ruuster_acks::AckManager;
 use ruuster_router::Router;
 use std::sync::Arc;
 
 use crate::domain::consumer_manager::ConsumerManager;
 use crate::domain::message_handler::MessageHandler;
 use crate::domain::topology_manager::TopologyManager;
+use crate::domain::acks_manager::AckManager;
 
 /// Central broker server state
 pub struct RuusterServer {
@@ -25,7 +25,8 @@ pub struct RuusterServer {
 }
 
 impl RuusterServer {
-    pub fn new(router: Arc<Router>) -> Self {
+    pub fn new() -> Self {
+        let router = Arc::new(Router::new());
         let consumer_manager = Arc::new(ConsumerManager::new());
         let ack_manager = Arc::new(AckManager::new());
         let topology_manager = Arc::new(TopologyManager::new(Arc::clone(&router)));

@@ -68,26 +68,16 @@ pub fn setup_default_topology(router: &Arc<Router>) {
     }
 }
 
-/// Run the Ruuster server with the given configuration
-pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let router = Arc::new(Router::new());
-    setup_default_topology(&router);
 
-    run_server_with_router(config, router).await
-}
-
-/// Run the Ruuster server with a custom router configuration
-/// This allows full control over the broker topology
-pub async fn run_server_with_router(
-    config: ServerConfig,
-    router: Arc<Router>,
+pub async fn run_server(
+    config: ServerConfig
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ruuster_service = Arc::new(RuusterServer::new(router));
+    let server = Arc::new(RuusterServer::new());
     let mut server_builder = Server::builder();
 
-    let message_service = MessageServiceServer::from_arc(ruuster_service.clone());
-    let topology_service = TopologyServiceServer::from_arc(ruuster_service.clone());
-    let ack_service = AckServiceServer::from_arc(ruuster_service.clone());
+    let message_service = MessageServiceServer::from_arc(server.clone());
+    let topology_service = TopologyServiceServer::from_arc(server.clone());
+    let ack_service = AckServiceServer::from_arc(server.clone());
 
     if config.enable_reflection {
         let reflection_service = tonic_reflection::server::Builder::configure()

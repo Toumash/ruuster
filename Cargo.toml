@@ -6,7 +6,6 @@ members = [
     "crates/ruuster-protos",
     "crates/ruuster-core",
     "crates/ruuster-router",
-    "crates/ruuster-acks"
 ]
 
 resolver = "2"

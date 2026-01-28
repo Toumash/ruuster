@@ -128,11 +128,6 @@ impl From<ServerError> for tonic::Status {
     }
 }
 
-// ===== Helper type alias for Results =====
-
-/// A specialized Result type for server operations
-// pub type ServerResult<T> = Result<T, ServerError>;
-
 #[cfg(test)]
 mod tests {
     use super::*;

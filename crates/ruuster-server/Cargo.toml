@@ -14,7 +14,6 @@ ruuster-protos = { path = "../ruuster-protos" }
 ruuster-internals = { path = "../ruuster-internals" }
 ruuster-core = { path = "../ruuster-core" }
 ruuster-router = { path = "../ruuster-router" }
-ruuster-acks = { path = "../ruuster-acks" }
 async-stream = "0.3.6"
 tonic-reflection = "0.14.2"
 opentelemetry = { version = "0.23" }

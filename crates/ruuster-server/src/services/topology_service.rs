@@ -104,12 +104,9 @@ impl TopologyService for RuusterServer {
 mod tests {
     use super::*;
     use crate::server::RuusterServer;
-    use ruuster_router::Router;
-    use std::sync::Arc;
 
     fn setup_test_server() -> RuusterServer {
-        let router = Arc::new(Router::new());
-        RuusterServer::new(router)
+        RuusterServer::new()
     }
 
     #[tokio::test]

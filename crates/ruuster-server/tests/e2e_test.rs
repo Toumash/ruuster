@@ -1,10 +1,42 @@
 use ruuster_protos::v1::message_service_client::MessageServiceClient;
 use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest};
+use ruuster_protos::v1::topology_service_client::TopologyServiceClient;
+use ruuster_protos::v1::{AddQueueRequest, AddExchangeRequest, BindRequest};
 use ruuster_server::ServerConfig;
 use std::time::Duration;
 use tokio::time::timeout;
 use tonic::Request;
 use uuid::Uuid;
+
+async fn create_default_topology(
+    queue_name: &str,
+    exchange_name: &str,
+) {
+    let mut client = TopologyServiceClient::connect("http://127.0.0.1:50051").await.unwrap();
+    // Add Queue
+    let add_queue_req = Request::new(AddQueueRequest {
+        queue_name: queue_name.into(),
+        max_capacity: 10,
+        durable: false,
+    });
+    client.add_queue(add_queue_req).await.unwrap();
+
+    // Add Exchange
+    let add_exchange_req = Request::new(AddExchangeRequest {
+        exchange_name: exchange_name.into(),
+        kind: 0, // Direct exchange
+        durable: false,
+    });
+    client.add_exchange(add_exchange_req).await.unwrap();
+
+    // Bind Queue to Exchange
+    let bind_req = Request::new(BindRequest {
+        exchange_name: exchange_name.into(),
+        queue_name: queue_name.into(),
+        routing_key: None,
+    });
+    client.bind(bind_req).await.unwrap();
+}
 
 async fn setup_server_and_client() -> MessageServiceClient<tonic::transport::Channel> {
     // Spawn the server in the background
@@ -28,6 +60,9 @@ async fn test_full_message_flow() {
 
     let queue_name = "default_q";
     let exchange_name = "default";
+
+    // 1. Create a queue and bind it to the default exchange
+    create_default_topology(queue_name, exchange_name).await;
 
     // 2. Start a Consumer Stream in a background task
     let consume_req = Request::new(ConsumeRequest {

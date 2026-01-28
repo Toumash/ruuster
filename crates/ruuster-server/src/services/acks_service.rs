@@ -88,14 +88,11 @@ mod tests {
     use super::*;
     use crate::server::RuusterServer;
     use ruuster_internals::Message;
-    use ruuster_router::Router;
-    use std::sync::Arc;
     use std::time::Duration;
     use uuid::Uuid;
 
     fn setup_test_server() -> RuusterServer {
-        let router = Arc::new(Router::new());
-        RuusterServer::new(router)
+        RuusterServer::new()
     }
 
     #[tokio::test]
