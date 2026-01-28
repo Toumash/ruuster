@@ -1,114 +1,102 @@
+use crate::RpcOk;
 use crate::server::RuusterServer;
 use ruuster_protos::v1::topology_service_server::TopologyService;
 use ruuster_protos::v1::{
-    AddExchangeRequest, AddExchangeResponse, AddQueueRequest, AddQueueResponse, BindRequest,
-    BindResponse, RemoveExchangeRequest, RemoveExchangeResponse, RemoveQueueRequest,
-    RemoveQueueResponse, UnbindRequest, UnbindResponse,
+    AddExchangeRequest, AddQueueRequest, BindRequest, RemoveExchangeRequest, RemoveQueueRequest,
+    UnbindRequest,
 };
+use tonic::Status;
+use crate::utils::{RpcRequest, RpcResponse};
 
-type RpcResponse<T> = Result<tonic::Response<T>, tonic::Status>;
-type RpcRequest<T> = tonic::Request<T>;
-
-macro_rules! ret_response {
-    ($response_type:ident) => {{
-        let response = $response_type {
-            error_message: String::new(),
-            success: true,
-        };
-        Ok(tonic::Response::new(response))
-    }};
-    ($response_type:ident, $error_msg:expr) => {{
-        let response = $response_type {
-            error_message: $error_msg.to_string(),
-            success: false,
-        };
-        Ok(tonic::Response::new(response))
-    }};
-}
 
 #[tonic::async_trait]
 impl TopologyService for RuusterServer {
     async fn add_queue(
         &self,
         request: RpcRequest<AddQueueRequest>,
-    ) -> RpcResponse<AddQueueResponse> {
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
         let queue_name = inner.queue_name;
         let max_capacity = inner.max_capacity;
 
-        match self.topology_manager.add_queue(queue_name, max_capacity) {
-            Ok(_) => ret_response!(AddQueueResponse),
-            Err(e) => ret_response!(AddQueueResponse, e.to_string()),
-        }
+        self.topology_manager.add_queue(queue_name, max_capacity)
+        .map_err(|e| {
+            Status::internal(format!("Cannot add queue: {}", e))
+        })?;
+
+        RpcOk!()
     }
 
     async fn remove_queue(
         &self,
         request: RpcRequest<RemoveQueueRequest>,
-    ) -> RpcResponse<RemoveQueueResponse> {
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
         let queue_name = inner.queue_name;
 
-        match self.topology_manager.remove_queue(&queue_name) {
-            Ok(_) => ret_response!(RemoveQueueResponse),
-            Err(e) => ret_response!(RemoveQueueResponse, e.to_string()),
-        }
+        self.topology_manager.remove_queue(&queue_name)
+        .map_err(|e| {
+            Status::internal(format!("Cannot remove queue: {}", e))
+        })?;
+
+        RpcOk!()
     }
 
     async fn add_exchange(
         &self,
         request: RpcRequest<AddExchangeRequest>,
-    ) -> RpcResponse<AddExchangeResponse> {
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
         let exchange_name = inner.exchange_name;
 
         // Use default DirectStrategy for now
         // TODO: Parse strategy from proto when we add strategy selection
-        match self.topology_manager.add_exchange(exchange_name, None) {
-            Ok(_) => ret_response!(AddExchangeResponse),
-            Err(e) => ret_response!(AddExchangeResponse, e.to_string()),
-        }
+        self.topology_manager.add_exchange(exchange_name, None).map_err(|e|{
+            Status::internal(format!("Cannot add exchange: {}", e))
+        })?;
+
+        RpcOk!()
     }
 
     async fn remove_exchange(
         &self,
         request: RpcRequest<RemoveExchangeRequest>,
-    ) -> RpcResponse<RemoveExchangeResponse> {
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
         let exchange_name = inner.exchange_name;
 
-        match self.topology_manager.remove_exchange(&exchange_name) {
-            Ok(_) => ret_response!(RemoveExchangeResponse),
-            Err(e) => ret_response!(RemoveExchangeResponse, e.to_string()),
-        }
+        self.topology_manager.remove_exchange(&exchange_name)
+        .map_err(|e| {
+            Status::internal(format!("Cannot remove exchange: {}", e))
+        })?;
+
+        RpcOk!()
     }
 
-    async fn bind(&self, request: RpcRequest<BindRequest>) -> RpcResponse<BindResponse> {
+    async fn bind(&self, request: RpcRequest<BindRequest>) -> RpcResponse<()> {
         let inner = request.into_inner();
         let exchange_name = inner.exchange_name;
         let queue_name = inner.queue_name;
 
-        match self
-            .topology_manager
-            .bind_queue(&exchange_name, &queue_name)
-        {
-            Ok(_) => ret_response!(BindResponse),
-            Err(e) => ret_response!(BindResponse, e.to_string()),
-        }
+        self.topology_manager.bind_queue(&exchange_name, &queue_name)
+        .map_err(|e| {
+            Status::internal(format!("Cannot bind queue: {}", e))
+        })?;
+
+        RpcOk!()
     }
 
-    async fn unbind(&self, request: RpcRequest<UnbindRequest>) -> RpcResponse<UnbindResponse> {
+    async fn unbind(&self, request: RpcRequest<UnbindRequest>) -> RpcResponse<()> {
         let inner = request.into_inner();
         let exchange_name = inner.exchange_name;
         let queue_name = inner.queue_name;
 
-        match self
-            .topology_manager
-            .unbind_queue(&exchange_name, &queue_name)
-        {
-            Ok(_) => ret_response!(UnbindResponse),
-            Err(e) => ret_response!(UnbindResponse, e.to_string()),
-        }
+        self.topology_manager.unbind_queue(&exchange_name, &queue_name)
+        .map_err(|e| {
+            Status::internal(format!("Cannot unbind queue: {}", e))
+        })?;
+
+        RpcOk!()
     }
 }
 
@@ -133,8 +121,8 @@ mod tests {
             max_capacity: 100,
             durable: false,
         });
-        let response = server.add_queue(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.add_queue(request).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -153,8 +141,8 @@ mod tests {
         let remove_req = tonic::Request::new(RemoveQueueRequest {
             queue_name: "test_queue".to_string(),
         });
-        let response = server.remove_queue(remove_req).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.remove_queue(remove_req).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -165,8 +153,10 @@ mod tests {
             queue_name: "nonexistent".to_string(),
         });
 
-        let response = server.remove_queue(request).await.unwrap();
-        assert!(!response.into_inner().success);
+        let response = server.remove_queue(request).await;
+        assert!(response.is_err());
+        let err = response.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Internal);
     }
 
     #[tokio::test]
@@ -178,8 +168,8 @@ mod tests {
             kind: 0, // Direct exchange
             durable: false,
         });
-        let response = server.add_exchange(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.add_exchange(request).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -198,8 +188,8 @@ mod tests {
         let remove_req = tonic::Request::new(RemoveExchangeRequest {
             exchange_name: "test_exchange".to_string(),
         });
-        let response = server.remove_exchange(remove_req).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.remove_exchange(remove_req).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -232,8 +222,8 @@ mod tests {
             routing_key: None,
         });
 
-        let response = server.bind(bind_req).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.bind(bind_req).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -255,10 +245,11 @@ mod tests {
             routing_key: None,
         });
 
-        let response = server.bind(bind_req).await.unwrap();
-        let inner = response.into_inner();
-        assert!(!inner.success);
-        assert!(inner.error_message.contains("Exchange"));
+        let response = server.bind(bind_req).await;
+        assert!(response.is_err());
+        let err = response.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Internal);
+        assert!(err.message().contains("Cannot bind queue"));
     }
 
     #[tokio::test]
@@ -300,7 +291,7 @@ mod tests {
             routing_key: None,
         });
 
-        let response = server.unbind(unbind_req).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.unbind(unbind_req).await;
+        assert!(response.is_ok());
     }
 }

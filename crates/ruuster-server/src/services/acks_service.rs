@@ -1,67 +1,31 @@
+use crate::RpcOk;
 use crate::server::RuusterServer;
+use crate::utils::{RpcRequest, RpcResponse, parse_uuid};
 use ruuster_protos::v1::ack_service_server::AckService;
-use ruuster_protos::v1::{
-    AckBulkRequest, AckBulkResponse, AckRequest, AckResponse, NackBulkRequest, NackBulkResponse,
-    NackRequest, NackResponse,
-};
-use uuid::Uuid;
-
-type RpcResponse<T> = Result<tonic::Response<T>, tonic::Status>;
-type RpcRequest<T> = tonic::Request<T>;
-
-macro_rules! ret_response {
-    ($response_type:ident) => {{
-        let response = $response_type {
-            error_message: String::new(),
-            success: true,
-        };
-        Ok(tonic::Response::new(response))
-    }};
-    ($response_type:ident, $error_msg:expr) => {{
-        let response = $response_type {
-            error_message: $error_msg.to_string(),
-            success: false,
-        };
-        Ok(tonic::Response::new(response))
-    }};
-}
+use ruuster_protos::v1::{AckBulkRequest, AckRequest, NackBulkRequest, NackRequest};
+use tonic::Status;
 
 #[tonic::async_trait]
 impl AckService for RuusterServer {
-    async fn ack_message(&self, request: RpcRequest<AckRequest>) -> RpcResponse<AckResponse> {
+    async fn ack_message(&self, request: RpcRequest<AckRequest>) -> RpcResponse<()> {
         let inner = request.into_inner();
 
-        // Parse message UUID from string
-        let message_id = match Uuid::parse_str(&inner.message_uuid) {
-            Ok(id) => id,
-            Err(e) => return ret_response!(AckResponse, format!("Invalid UUID: {}", e)),
-        };
+        let message_id = parse_uuid(inner.message_uuid.as_slice())?;
 
-        // Apply acknowledgment
-        match self.ack_manager.apply_ack(&message_id) {
-            Ok(_) => {
-                // TODO: Track consumer_id in message metadata to enable untracking
-                // For now, we don't have consumer_id in AckRequest proto
-                ret_response!(AckResponse)
-            }
-            Err(e) => ret_response!(AckResponse, format!("Ack failed: {:?}", e)),
-        }
+        self.ack_manager
+            .apply_ack(&message_id)
+            .map_err(|e| Status::internal(format!("Ack failed: {:?}", e)))?;
+
+        RpcOk!()
     }
 
-    async fn ack_bulk(&self, request: RpcRequest<AckBulkRequest>) -> RpcResponse<AckBulkResponse> {
+    async fn ack_bulk(&self, request: RpcRequest<AckBulkRequest>) -> RpcResponse<()> {
         let inner = request.into_inner();
         let mut failed_count = 0;
         let mut errors = Vec::new();
 
         for ack_req in &inner.ack_requests {
-            let message_id = match Uuid::parse_str(&ack_req.message_uuid) {
-                Ok(id) => id,
-                Err(e) => {
-                    failed_count += 1;
-                    errors.push(format!("Invalid UUID: {}", e));
-                    continue;
-                }
-            };
+            let message_id = parse_uuid(&ack_req.message_uuid.as_slice())?;
 
             if let Err(e) = self.ack_manager.apply_ack(&message_id) {
                 failed_count += 1;
@@ -69,53 +33,37 @@ impl AckService for RuusterServer {
             }
         }
 
-        if failed_count == 0 {
-            ret_response!(AckBulkResponse)
-        } else {
-            ret_response!(
-                AckBulkResponse,
-                format!("Failed to ack {} messages: {:?}", failed_count, errors)
-            )
+        if failed_count > 0 {
+            return Err(Status::internal(format!(
+                "Failed to ack {} messages: {:?}",
+                failed_count, errors
+            )));
         }
+
+        RpcOk!()
     }
 
-    async fn nack_message(&self, request: RpcRequest<NackRequest>) -> RpcResponse<NackResponse> {
+    async fn nack_message(&self, request: RpcRequest<NackRequest>) -> RpcResponse<()> {
         let inner = request.into_inner();
 
-        // Parse message UUID from string
-        let message_id = match Uuid::parse_str(&inner.message_uuid) {
-            Ok(id) => id,
-            Err(e) => return ret_response!(NackResponse, format!("Invalid UUID: {}", e)),
-        };
+        let message_id = parse_uuid(inner.message_uuid.as_slice())?;
 
-        // Apply negative acknowledgment
-        match self.ack_manager.apply_nack(&message_id) {
-            Ok(_) => {
-                // TODO: Implement requeue logic using inner.requeue flag
-                // TODO: Get message from ack_manager and requeue to queue_name
-                ret_response!(NackResponse)
-            }
-            Err(e) => ret_response!(NackResponse, format!("Nack failed: {:?}", e)),
-        }
+        self.ack_manager.apply_nack(&message_id)
+            .map_err(|e| Status::internal(format!("Nack failed: {:?}", e)))?;
+
+        RpcOk!()
     }
 
     async fn nack_bulk(
         &self,
         request: RpcRequest<NackBulkRequest>,
-    ) -> RpcResponse<NackBulkResponse> {
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
         let mut failed_count = 0;
         let mut errors = Vec::new();
 
         for nack_req in &inner.nack_requests {
-            let message_id = match Uuid::parse_str(&nack_req.message_uuid) {
-                Ok(id) => id,
-                Err(e) => {
-                    failed_count += 1;
-                    errors.push(format!("Invalid UUID: {}", e));
-                    continue;
-                }
-            };
+                let message_id = parse_uuid(&nack_req.message_uuid.as_slice())?;
 
             if let Err(e) = self.ack_manager.apply_nack(&message_id) {
                 failed_count += 1;
@@ -124,14 +72,14 @@ impl AckService for RuusterServer {
             // TODO: Implement requeue logic using nack_req.requeue flag
         }
 
-        if failed_count == 0 {
-            ret_response!(NackBulkResponse)
-        } else {
-            ret_response!(
-                NackBulkResponse,
-                format!("Failed to nack {} messages: {:?}", failed_count, errors)
-            )
+        if failed_count > 0 {
+            return Err(Status::internal(format!(
+                "Failed to nack {} messages: {:?}",
+                failed_count, errors
+            )));
         }
+
+        RpcOk!()
     }
 }
 
@@ -166,11 +114,11 @@ mod tests {
 
         let request = tonic::Request::new(AckRequest {
             queue_name: "test_queue".to_string(),
-            message_uuid: msg_id.to_string(),
+            message_uuid: msg_id.as_bytes().to_vec(),
         });
 
-        let response = server.ack_message(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.ack_message(request).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -179,13 +127,13 @@ mod tests {
 
         let request = tonic::Request::new(AckRequest {
             queue_name: "test_queue".to_string(),
-            message_uuid: "invalid-uuid".to_string(),
+            message_uuid: b"invalid-uuid".to_vec(),
         });
 
-        let response = server.ack_message(request).await.unwrap();
-        let inner = response.into_inner();
-        assert!(!inner.success);
-        assert!(inner.error_message.contains("Invalid UUID"));
+        let response = server.ack_message(request).await;
+        assert!(response.is_err());
+        let err = response.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
     }
 
     #[tokio::test]
@@ -195,13 +143,14 @@ mod tests {
 
         let request = tonic::Request::new(AckRequest {
             queue_name: "test_queue".to_string(),
-            message_uuid: msg_id.to_string(),
+            message_uuid: msg_id.as_bytes().to_vec(),
         });
 
-        let response = server.ack_message(request).await.unwrap();
-        let inner = response.into_inner();
-        assert!(!inner.success);
-        assert!(inner.error_message.contains("Ack failed"));
+        let response = server.ack_message(request).await;
+        assert!(response.is_err());
+        let err = response.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Internal);
+        assert!(err.message().contains("Ack failed"));
     }
 
     #[tokio::test]
@@ -231,17 +180,17 @@ mod tests {
             ack_requests: vec![
                 AckRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id1.to_string(),
+                    message_uuid: msg_id1.as_bytes().to_vec(),
                 },
                 AckRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id2.to_string(),
+                    message_uuid: msg_id2.as_bytes().to_vec(),
                 },
             ],
         });
 
-        let response = server.ack_bulk(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.ack_bulk(request).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -264,19 +213,20 @@ mod tests {
             ack_requests: vec![
                 AckRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id1.to_string(),
+                    message_uuid: msg_id1.as_bytes().to_vec(),
                 },
                 AckRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id2.to_string(), // This one doesn't exist
+                    message_uuid: msg_id2.as_bytes().to_vec(), // This one doesn't exist
                 },
             ],
         });
 
-        let response = server.ack_bulk(request).await.unwrap();
-        let inner = response.into_inner();
-        assert!(!inner.success);
-        assert!(inner.error_message.contains("Failed to ack 1 messages"));
+        let response = server.ack_bulk(request).await;
+        assert!(response.is_err());
+        let err = response.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::Internal);
+        assert!(err.message().contains("Failed to ack 1 messages"));
     }
 
     #[tokio::test]
@@ -295,12 +245,12 @@ mod tests {
 
         let request = tonic::Request::new(NackRequest {
             queue_name: "test_queue".to_string(),
-            message_uuid: msg_id.to_string(),
+            message_uuid: msg_id.as_bytes().to_vec(),
             requeue: true,
         });
 
-        let response = server.nack_message(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.nack_message(request).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
@@ -330,18 +280,18 @@ mod tests {
             nack_requests: vec![
                 NackRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id1.to_string(),
+                    message_uuid: msg_id1.as_bytes().to_vec(),
                     requeue: true,
                 },
                 NackRequest {
                     queue_name: "test_queue".to_string(),
-                    message_uuid: msg_id2.to_string(),
+                    message_uuid: msg_id2.as_bytes().to_vec(),
                     requeue: false,
                 },
             ],
         });
 
-        let response = server.nack_bulk(request).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.nack_bulk(request).await;
+        assert!(response.is_ok());
     }
 }

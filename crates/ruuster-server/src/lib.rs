@@ -4,6 +4,7 @@
 //! It can be used as a library for embedding the broker in other applications,
 //! or run standalone via the binary.
 
+mod utils;
 mod domain;
 mod error;
 mod server;

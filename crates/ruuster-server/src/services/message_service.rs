@@ -1,18 +1,20 @@
 use futures::Stream;
 use ruuster_internals::Message;
 use ruuster_protos::v1::message_service_server::MessageService;
-use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest, ProduceResponse};
+use ruuster_protos::v1::{ConsumeRequest, Message as ProtoMsg, ProduceRequest};
 use std::pin::Pin;
-use tonic::{Request, Response, Status};
+use tonic::Status;
 
+use crate::RpcOk;
 use crate::server::RuusterServer;
+use crate::utils::{RpcResponse, RpcRequest};
 
 #[tonic::async_trait]
 impl MessageService for RuusterServer {
     async fn produce(
         &self,
-        request: Request<ProduceRequest>,
-    ) -> Result<Response<ProduceResponse>, Status> {
+        request: RpcRequest<ProduceRequest>,
+    ) -> RpcResponse<()> {
         let inner = request.into_inner();
 
         // 1. Validate & convert proto -> internal
@@ -25,24 +27,18 @@ impl MessageService for RuusterServer {
             .map_err(|e| Status::internal(format!("Conversion error: {}", e)))?;
 
         // 2. Delegate to business logic layer
-        match self.message_handler.produce(&exchange_name, msg) {
-            Ok(_) => Ok(Response::new(ProduceResponse {
-                success: true,
-                error_message: "".into(),
-            })),
-            Err(e) => Ok(Response::new(ProduceResponse {
-                success: false,
-                error_message: e.to_string(),
-            })),
-        }
+        self.message_handler
+            .produce(&exchange_name, msg)
+            .map_err(|e| Status::internal(format!("Produce error: {}", e)))?;
+        RpcOk!()
     }
 
     type ConsumeStream = Pin<Box<dyn Stream<Item = Result<ProtoMsg, Status>> + Send>>;
 
     async fn consume(
         &self,
-        request: Request<ConsumeRequest>,
-    ) -> Result<Response<Self::ConsumeStream>, Status> {
+        request: RpcRequest<ConsumeRequest>,
+    ) -> RpcResponse<Self::ConsumeStream> {
         let inner = request.into_inner();
         let queue_name = inner.queue_name;
 
@@ -63,7 +59,7 @@ impl MessageService for RuusterServer {
             }
         };
 
-        Ok(Response::new(Box::pin(proto_stream)))
+        RpcOk!(Box::pin(proto_stream))
     }
 }
 
@@ -93,7 +89,7 @@ mod tests {
     async fn test_produce_success() {
         let server = setup_test_server().await;
 
-        let req = Request::new(ProduceRequest {
+        let req = RpcRequest::new(ProduceRequest {
             exchange: "test_ex".into(),
             message: Some(ProtoMsg {
                 uuid: Uuid::new_v4().as_bytes().to_vec(),
@@ -103,14 +99,14 @@ mod tests {
             }),
         });
 
-        let response = server.produce(req).await.unwrap();
-        assert!(response.into_inner().success);
+        let response = server.produce(req).await;
+        assert!(response.is_ok());
     }
 
     #[tokio::test]
     async fn test_produce_invalid_exchange() {
         let server = setup_test_server().await;
-        let req = Request::new(ProduceRequest {
+        let req = RpcRequest::new(ProduceRequest {
             exchange: "invalid_ex".into(),
             message: Some(ProtoMsg {
                 uuid: Uuid::new_v4().as_bytes().to_vec(),
@@ -118,7 +114,7 @@ mod tests {
             }),
         });
 
-        let response = server.produce(req).await.unwrap();
-        assert!(!response.into_inner().success);
+        let response = server.produce(req).await;
+        assert!(response.is_err());
     }
 }

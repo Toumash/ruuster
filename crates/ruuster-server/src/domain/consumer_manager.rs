@@ -2,6 +2,8 @@ use dashmap::DashMap;
 use ruuster_core::Queue;
 use std::sync::Arc;
 use uuid::Uuid;
+use std::collections::HashSet;
+use std::time::Instant;
 
 #[derive(Default)]
 pub struct ConsumerManager {
@@ -9,12 +11,11 @@ pub struct ConsumerManager {
 }
 
 struct ConsumerState {
-    //consumer_id: Uuid, // Check if needed
-    //queue_name: String, // Check if needed (we can get name from queue)
-    queue: Arc<Queue>, // Check if needed. NOTE(msaff): may be usefull to keep some kind of Option<QueueProperties> object istead of full Queue 
+    // consumer_id: Uuid, // Check if needed
+    // queue: Arc<Queue>, // Check if needed. NOTE(msaff): may be usefull to keep some kind of Option<QueueProperties> object istead of full Queue 
     prefetch_count: u16,
-    unacked_messages: Vec<Uuid>, // Message IDs awaiting ack - TODO
-    last_activity: std::time::Instant,
+    unacked_messages: HashSet<Uuid>, // Message IDs awaiting ack - TODO
+    last_activity: Instant,
 }
 
 impl ConsumerManager {
@@ -25,15 +26,14 @@ impl ConsumerManager {
     }
 
     /// Register a new consumer
-    pub fn register_consumer(&self, queue: Arc<Queue>, prefetch_count: u16) -> Uuid {
+    pub fn register_consumer(&self, _queue: Arc<Queue>, prefetch_count: u16) -> Uuid {
         let consumer_id = Uuid::new_v4();
         let state = ConsumerState {
-            //consumer_id,
-            //queue_name: queue.name.clone(),
-            queue,
+            // consumer_id,
+            // queue,
             prefetch_count,
-            unacked_messages: Vec::new(),
-            last_activity: std::time::Instant::now(),
+            unacked_messages: HashSet::new(),
+            last_activity: Instant::now(),
         };
         self.consumers.insert(consumer_id, state);
         consumer_id
@@ -50,15 +50,15 @@ impl ConsumerManager {
     /// Track message delivery (before ack)
     pub fn track_delivery(&self, consumer_id: &Uuid, message_id: Uuid) {
         if let Some(mut consumer) = self.consumers.get_mut(consumer_id) {
-            consumer.unacked_messages.push(message_id);
-            consumer.last_activity = std::time::Instant::now();
+            consumer.unacked_messages.insert(message_id);
+            consumer.last_activity = Instant::now();
         }
     }
 
     /// Remove tracked message (after ack)
     pub fn untrack_message(&self, consumer_id: &Uuid, message_id: &Uuid) {
         if let Some(mut consumer) = self.consumers.get_mut(consumer_id) {
-            consumer.unacked_messages.retain(|id| id != message_id);
+            consumer.unacked_messages.remove(message_id);
         }
     }
 

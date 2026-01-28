@@ -3,9 +3,10 @@ syntax = "proto3";
 package messages_v1;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
 
 service MessageService {
-  rpc Produce(ProduceRequest) returns (ProduceResponse);
+  rpc Produce(ProduceRequest) returns (google.protobuf.Empty);
   rpc Consume(ConsumeRequest) returns (stream Message); 
 }
 
@@ -24,11 +25,6 @@ message MessageMetadata {
 message ProduceRequest {
   string exchange = 1;
   Message message = 2;
-}
-
-message ProduceResponse {
-  bool success = 1;
-  string error_message = 2;
 }
 
 message ConsumeRequest {

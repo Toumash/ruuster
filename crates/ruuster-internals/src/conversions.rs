@@ -5,10 +5,6 @@ use crate::structs::{Message, MessageMetadata};
 use ruuster_protos::v1::{Message as ProtoMsg, MessageMetadata as ProtoMeta};
 use uuid::Uuid;
 
-// ==========================================
-// 1. INGRESS: PROTO -> INTERNAL (Validation)
-// ==========================================
-
 impl TryFrom<ProtoMsg> for Message {
     type Error = RuusterError;
 
@@ -40,10 +36,6 @@ impl From<ProtoMeta> for MessageMetadata {
     }
 }
 
-// ==========================================
-// 2. EGRESS: INTERNAL -> PROTO (Translation)
-// ==========================================
-
 impl From<Message> for ProtoMsg {
     fn from(internal: Message) -> Self {
         Self {
@@ -70,3 +62,4 @@ impl From<MessageMetadata> for ProtoMeta {
         }
     }
 }
+

@@ -2,16 +2,18 @@ syntax = "proto3";
 
 package acks_v1;
 
+import "google/protobuf/empty.proto";
+
 service AckService {
-  rpc AckMessage(AckRequest) returns (AckResponse);
-  rpc AckBulk(AckBulkRequest) returns (AckBulkResponse);
-  rpc NackMessage(NackRequest) returns (NackResponse);
-  rpc NackBulk(NackBulkRequest) returns (NackBulkResponse);
+  rpc AckMessage(AckRequest) returns (google.protobuf.Empty);
+  rpc AckBulk(AckBulkRequest) returns (google.protobuf.Empty);
+  rpc NackMessage(NackRequest) returns (google.protobuf.Empty);
+  rpc NackBulk(NackBulkRequest) returns (google.protobuf.Empty);
 }
   
 message AckRequest {
   string queue_name = 1;
-  string message_uuid = 2;
+  bytes message_uuid = 2;
 }
 
 message AckBulkRequest {
@@ -20,30 +22,10 @@ message AckBulkRequest {
 
 message NackRequest {
   string queue_name = 1;
-  string message_uuid = 2;
+  bytes message_uuid = 2;
   bool requeue = 3;
 }
 
 message NackBulkRequest {
   repeated NackRequest nack_requests = 1;
-}
-
-message AckResponse {
-  bool success = 1;
-  string error_message = 2;
-}
-
-message AckBulkResponse {
-  bool success = 1;
-  string error_message = 2;
-}
-
-message NackResponse {
-  bool success = 1;
-  string error_message = 2;
-}
-
-message NackBulkResponse {
-  bool success = 1;
-  string error_message = 2;
 }
