@@ -11,7 +11,7 @@ pub struct ConsumerManager {
 struct ConsumerState {
     //consumer_id: Uuid, // Check if needed
     //queue_name: String, // Check if needed (we can get name from queue)
-    queue: Arc<Queue>, // Check if needed
+    queue: Arc<Queue>, // Check if needed. NOTE(msaff): may be usefull to keep some kind of Option<QueueProperties> object istead of full Queue 
     prefetch_count: u16,
     unacked_messages: Vec<Uuid>, // Message IDs awaiting ack - TODO
     last_activity: std::time::Instant,
